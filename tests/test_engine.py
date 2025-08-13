@@ -9,7 +9,7 @@ import unittest
 
 # Must be before imports from src
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-from engine import DelegationDecisionEngine  # noqa: E402
+from claude_codex_bridge.engine import DelegationDecisionEngine  # noqa: E402
 
 
 class TestDelegationDecisionEngine(unittest.TestCase):

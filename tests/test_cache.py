@@ -10,7 +10,7 @@ import unittest
 
 # Must be before imports from src
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-from cache import ResultCache  # noqa: E402
+from claude_codex_bridge.cache import ResultCache  # noqa: E402
 
 
 class TestResultCache(unittest.TestCase):
