@@ -108,7 +108,9 @@ class ResultCache:
                         # Read file content and calculate hash
                         with open(file_path, "rb") as f:
                             file_content = f.read()
-                            file_hash = hashlib.md5(file_content).hexdigest()
+                            file_hash = hashlib.md5(
+                                file_content, usedforsecurity=False
+                            ).hexdigest()  # noqa: S324
                             relative_path = os.path.relpath(file_path, directory)
                             file_hashes.append(f"{relative_path}:{file_hash}")
                     except (IOError, OSError):
