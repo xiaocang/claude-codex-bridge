@@ -1,7 +1,8 @@
 """
 Cache Module
 
-Provides result caching functionality to improve performance and avoid duplicate execution of same tasks.
+Provides result caching functionality to improve performance and avoid
+duplicate execution of same tasks.
 """
 
 import hashlib
@@ -15,7 +16,8 @@ class ResultCache:
     """
     Memory-based result caching system.
 
-    Uses task description, file content hash, and execution parameters to generate cache keys,
+    Uses task description, file content hash, and execution parameters to
+    generate cache keys,
     avoiding duplicate execution of same Codex tasks.
     """
 
@@ -174,7 +176,7 @@ class ResultCache:
         # Update access time (LRU)
         cache_entry["last_accessed"] = time.time()
 
-        return cache_entry["result"]
+        return str(cache_entry["result"])
 
     def set(
         self,
@@ -184,7 +186,7 @@ class ResultCache:
         sandbox_mode: str,
         output_format: str,
         result: str,
-    ):
+    ) -> None:
         """
         Store result in cache.
 
@@ -226,7 +228,7 @@ class ResultCache:
             ),
         }
 
-    def _evict_oldest(self):
+    def _evict_oldest(self) -> None:
         """Delete the least recently used cache entry (LRU policy)."""
         if not self.cache:
             return
@@ -238,7 +240,7 @@ class ResultCache:
 
         del self.cache[oldest_key]
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear all cache."""
         self.cache.clear()
 
@@ -269,7 +271,7 @@ class ResultCache:
             ),
         }
 
-    def cleanup_expired(self):
+    def cleanup_expired(self) -> int:
         """Clean up expired cache entries."""
         current_time = time.time()
         expired_keys = [

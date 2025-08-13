@@ -12,7 +12,7 @@ class DelegationDecisionEngine:
     Analyzes tasks and decides whether and how to delegate to Codex CLI.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         pass
 
     def should_delegate(self, task_description: str) -> bool:
@@ -34,10 +34,12 @@ class DelegationDecisionEngine:
 
     def prepare_codex_prompt(self, task_description: str) -> str:
         """
-        Preprocess original task description to generate instructions more suitable for Codex.
+        Preprocess original task description to generate instructions more
+        suitable for Codex.
 
         V1 version: Direct passthrough of original description.
-        V2 version: Can convert natural language requests to more structured, explicit instruction sets.
+        V2 version: Can convert natural language requests to more structured,
+        explicit instruction sets.
 
         Args:
             task_description: Original task description

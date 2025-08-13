@@ -62,3 +62,6 @@ tmp/
 .env.production
 .env.development
 secrets.json
+
+.claude/
+.coverage
