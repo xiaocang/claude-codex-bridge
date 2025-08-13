@@ -4,7 +4,7 @@ An intelligent **MCP (Model Context Protocol) server** for orchestrating task de
 
 ## Project Overview
 
-Claude-Codex Bridge is an **Agentic Bridge** that intelligently delegates coding tasks from Claude Code to locally running OpenAI Codex CLI. Rather than a simple request forwarder, it's an intelligent orchestration system with decision-making capabilities, featuring metacognitive optimization, result caching, and security validation.
+Claude-Codex Bridge is an **Agentic Bridge** that intelligently delegates coding tasks from Claude Code to locally running OpenAI Codex CLI. Rather than a simple request forwarder, it's an intelligent orchestration system with decision-making capabilities, featuring result caching and security validation.
 
 ## Core Features
 
@@ -13,8 +13,7 @@ Claude-Codex Bridge is an **Agentic Bridge** that intelligently delegates coding
 - **Working Directory Management**: Secure working directory validation and file access control
 - **Execution Mode Control**: Supports multiple execution and sandbox modes for different security requirements
 
-### 🧠 Metacognitive Optimization
-- **Instruction Optimization**: Uses Claude 3 Haiku to automatically optimize task instructions, improving execution success rates
+### 🧠 Intelligent Processing
 - **Context Enhancement**: Intelligent context generation and file content management
 - **Error Handling**: Comprehensive error handling and fallback mechanisms
 
@@ -37,7 +36,6 @@ graph TD
 
     C --> D[Delegation Decision Engine]
     C --> E[Result Cache]
-    C --> F[Metacognitive Optimizer]
 
     C --> G[Codex CLI]
     G --> H[Local Sandbox]
@@ -51,9 +49,8 @@ graph TD
 
 1. **MCP Server**: High-performance server based on FastMCP, providing standardized tool interfaces
 2. **Delegation Decision Engine (DDE)**: Intelligently analyzes tasks and determines optimal execution strategies
-3. **Metacognitive Optimizer**: Uses Claude API to optimize task instructions, improving execution quality
-4. **Result Cache**: Intelligent caching system based on content hashes, avoiding duplicate executions
-5. **Output Parser**: Intelligently identifies and formats Codex output into structured data
+3. **Result Cache**: Intelligent caching system based on content hashes, avoiding duplicate executions
+4. **Output Parser**: Intelligently identifies and formats Codex output into structured data
 
 ## Quick Start
 
@@ -62,13 +59,12 @@ graph TD
 1. **Python 3.11+**
 2. **uv Package Manager**: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 3. **OpenAI Codex CLI**: `npm install -g @openai/codex`
-4. **Optional**: Anthropic API Key (for metacognitive optimization)
 
 ### Installation
 
 1. **Clone the project**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/xiaocang/claude-codex-bridge.git 
    cd claude-codex-bridge
    ```
 
@@ -136,42 +132,11 @@ Get cache statistics and clean up expired entries.
 
 Clear all cache entries.
 
-## MCP Resources
-
-### `bridge://docs/usage`
-
-Detailed usage guide and best practices.
-
-### `bridge://docs/best_practices`
-
-Best practice guide for writing effective Codex delegation instructions.
-
-## MCP Prompt Templates
-
-### `refactor_code`
-
-Generate prompt templates for code refactoring tasks.
-
-**Parameters**:
-- `file_path`: Path to the file to refactor
-- `refactor_type`: Type of refactoring (general/performance/readability/structure)
-
-### `generate_tests`
-
-Generate prompt templates for test creation tasks.
-
-**Parameters**:
-- `file_path`: Path to the file to generate tests for
-- `test_framework`: Testing framework (pytest/unittest/jest, etc.)
-
 ## Configuration Options
 
 ### Environment Variables
 
 ```bash
-# Metacognitive optimization (optional)
-ANTHROPIC_API_KEY=sk-ant-...
-
 # Cache configuration
 CACHE_TTL=3600          # Cache TTL in seconds
 MAX_CACHE_SIZE=100      # Maximum cache entries
@@ -275,11 +240,6 @@ A: Make sure it's installed: npm install -g @openai/codex
 A: Check that the directory path is absolute and exists
 ```
 
-**Q: Metacognitive optimization not working**
-```
-A: Check if ANTHROPIC_API_KEY environment variable is set
-```
-
 **Q: Cache miss**
 ```
 A: File content changes invalidate cache, this is normal behavior
@@ -288,9 +248,8 @@ A: File content changes invalidate cache, this is normal behavior
 ## Performance Optimization Tips
 
 1. **Enable caching**: Set appropriate TTL and cache size
-2. **Metacognitive optimization**: Configure Anthropic API Key to improve instruction quality
-3. **Reasonable timeouts**: Set timeout based on task complexity
-4. **Regular cleanup**: Use `clear_cache` tool to clean unused cache
+2. **Reasonable timeouts**: Set timeout based on task complexity
+3. **Regular cleanup**: Use `clear_cache` tool to clean unused cache
 
 ## Version History
 
@@ -298,17 +257,8 @@ A: File content changes invalidate cache, this is normal behavior
 - ✅ Basic MCP server implementation
 - ✅ Codex CLI integration
 - ✅ Delegation Decision Engine
-- ✅ Metacognitive instruction optimization
 - ✅ Result caching system
 - ✅ Security validation mechanism
-
-## Contributing
-
-1. Fork the project
-2. Create a feature branch: `git checkout -b feature-name`
-3. Commit changes: `git commit -am 'Add feature'`
-4. Push branch: `git push origin feature-name`
-5. Create a Pull Request
 
 ## License
 
