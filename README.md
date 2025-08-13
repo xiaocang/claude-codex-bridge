@@ -57,8 +57,7 @@ graph TD
 ### Prerequisites
 
 1. **Python 3.11+**
-2. **uv Package Manager**: `curl -LsSf https://astral.sh/uv/install.sh | sh`
-3. **OpenAI Codex CLI**: `npm install -g @openai/codex`
+2. **OpenAI Codex CLI**: `npm install -g @openai/codex`
 
 ### Installation
 
@@ -70,13 +69,15 @@ pip install claude-codex-bridge
 
 #### From Source
 
-1. **Clone the project**
+1. **uv Package Manager** (if building from source): `curl -LsSf https://astral.sh/uv/install.sh | sh`
+
+2. **Clone the project**
    ```bash
    git clone https://github.com/xiaocang/claude-codex-bridge.git 
    cd claude-codex-bridge
    ```
 
-2. **Install dependencies**
+3. **Install dependencies**
    ```bash
    uv sync
    ```
@@ -86,7 +87,7 @@ pip install claude-codex-bridge
    pip install -e .
    ```
 
-3. **Configure environment variables** (optional)
+4. **Configure environment variables** (optional)
    ```bash
    # Copy environment variable template
    cp .env.example .env
@@ -95,22 +96,26 @@ pip install claude-codex-bridge
    vim .env
    ```
 
-4. **Start the server**
-   
-   If installed from PyPI:
-   ```bash
-   claude-codex-bridge
-   ```
-   
-   Or if running from source:
-   ```bash
-   uv run python -m claude_codex_bridge
-   ```
-   
-   Or directly:
-   ```bash
-   uv run src/claude_codex_bridge/bridge_server.py
-   ```
+### Starting the Server
+
+After installation, you can start the server using one of these methods:
+
+**If installed from PyPI:**
+```bash
+claude-codex-bridge
+```
+
+**Or using Python module:**
+```bash
+python -m claude_codex_bridge
+```
+
+**If running from source:**
+```bash
+uv run python -m claude_codex_bridge
+# Or directly:
+uv run src/claude_codex_bridge/bridge_server.py
+```
 
 ### Claude Code Integration
 
