@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "codex-bridge": {
+      "command": "uv",
+      "args": ["run", "src/bridge_server.py"],
+      "env": {}
+    }
+  }
+}
