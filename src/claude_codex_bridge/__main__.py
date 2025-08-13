@@ -6,9 +6,9 @@ import asyncio
 from .bridge_server import mcp
 
 
-def main():
+def main() -> None:
     """Main entry point."""
-    asyncio.run(mcp.run())
+    asyncio.run(mcp.run())  # type: ignore[func-returns-value]
 
 
 if __name__ == "__main__":

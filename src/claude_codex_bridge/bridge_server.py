@@ -17,8 +17,8 @@ try:
     from .engine import DelegationDecisionEngine
 except ImportError:
     # When running directly, use absolute imports
-    from cache import ResultCache
-    from engine import DelegationDecisionEngine
+    from cache import ResultCache  # type: ignore[no-redef]
+    from engine import DelegationDecisionEngine  # type: ignore[no-redef]
 
 # Initialize FastMCP instance
 mcp = FastMCP(
