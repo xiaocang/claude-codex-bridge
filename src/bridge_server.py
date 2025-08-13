@@ -1,11 +1,13 @@
 """
 Claude-Codex Bridge MCP Server
 
-An intelligent bridge MCP server for orchestrating task delegation between Claude and OpenAI Codex CLI.
+An intelligent bridge MCP server for orchestrating task delegation
+between Claude and OpenAI Codex CLI.
 """
 
 import asyncio
 import json
+import os
 from typing import Literal, Tuple
 
 from mcp.server.fastmcp import FastMCP
@@ -21,14 +23,14 @@ except ImportError:
 # Initialize FastMCP instance
 mcp = FastMCP(
     name="claude-codex-bridge",
-    instructions="An intelligent MCP server for orchestrating task delegation between Claude and Codex CLI.",
+    instructions="An intelligent MCP server for orchestrating task delegation "
+    "between Claude and Codex CLI.",
 )
 
 # Initialize Delegation Decision Engine
 dde = DelegationDecisionEngine()
 
 # Initialize result cache
-import os
 
 cache_ttl = int(os.environ.get("CACHE_TTL", "3600"))  # Default 1 hour
 cache_max_size = int(os.environ.get("MAX_CACHE_SIZE", "100"))  # Default 100 entries
@@ -84,7 +86,7 @@ async def invoke_codex_cli(
             *command,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            cwd=working_directory,  # Also set process working directory as double protection
+            cwd=working_directory,  # Also set as double protection
         )
 
         # Wait for process completion (with timeout)
@@ -96,7 +98,8 @@ async def invoke_codex_cli(
                 stderr.decode("utf-8").strip() if stderr else "Unknown error"
             )
             raise RuntimeError(
-                f"Codex CLI execution failed (exit code: {process.returncode}): {error_message}"
+                f"Codex CLI execution failed (exit code: {process.returncode}): "
+                f"{error_message}"
             )
 
         return stdout.decode("utf-8"), stderr.decode("utf-8")
@@ -117,7 +120,8 @@ async def invoke_codex_cli(
 
     except FileNotFoundError:
         raise RuntimeError(
-            "codex command not found. Please ensure OpenAI Codex CLI is installed: npm install -g @openai/codex"
+            "codex command not found. Please ensure OpenAI Codex CLI is "
+            "installed: npm install -g @openai/codex"
         )
 
 
@@ -169,12 +173,16 @@ async def codex_delegate(
     """
     Delegate complex coding tasks to the OpenAI Codex CLI.
 
-    Use this tool when you need to refactor code, fix bugs, generate new functions, add tests, or explain code snippets.
-    It provides a structured way to interact with the local file system and leverage Codex's powerful coding capabilities.
+    Use this tool when you need to refactor code, fix bugs, generate new
+    functions, add tests, or explain code snippets. It provides a structured
+    way to interact with the local file system and leverage Codex's powerful
+    coding capabilities.
 
     Args:
-        task_description: A detailed, natural language description of the task to delegate to Codex.
-        working_directory: The path to the project’s working directory where Codex will operate.
+        task_description: A detailed, natural language description of the
+            task to delegate to Codex.
+        working_directory: The path to the project's working directory where
+            Codex will operate.
         execution_mode: The approval policy mode for the Codex CLI.
         sandbox_mode: The sandbox policy mode for the Codex CLI.
         output_format: The expected format of the result.
@@ -345,7 +353,8 @@ def get_usage_guide() -> str:
     return """
 # Claude-Codex Bridge Usage Guide
 
-Claude-Codex Bridge is an intelligent MCP server for orchestrating task delegation between Claude and OpenAI Codex CLI.
+Claude-Codex Bridge is an intelligent MCP server for orchestrating task
+delegation between Claude and OpenAI Codex CLI.
 
 ## Basic Usage
 
@@ -365,7 +374,8 @@ codex_delegate(
 
 **task_description** (required)
 - Detailed natural language description of the task to delegate to Codex
-- Example: "Refactor main.py file by extracting all functions into a new class named Utils"
+- Example: "Refactor main.py file by extracting all functions into a
+  new class named Utils"
 
 **working_directory** (required)
 - Absolute path to project working directory
@@ -391,17 +401,22 @@ codex_delegate(
 ## Advanced Features
 
 ### Metacognitive Instruction Optimization
-When `ANTHROPIC_API_KEY` environment variable is set, the bridge uses Claude 3 Haiku to automatically optimize your task instructions for clarity and specificity.
+When `ANTHROPIC_API_KEY` environment variable is set, the bridge uses
+Claude 3 Haiku to automatically optimize your task instructions for clarity
+and specificity.
 
 ### Automatic Output Type Detection
-The bridge automatically recognizes Codex return content types (diff, code blocks, or explanation text) and labels them in responses.
+The bridge automatically recognizes Codex return content types (diff,
+code blocks, or explanation text) and labels them in responses.
 
 ## Best Practices
 
 1. **Clear task objectives**: Clearly state "what" you want done, not "how"
 2. **Provide full paths**: Always use absolute paths for working directories
-3. **Choose appropriate execution mode**: Select suitable execution and sandbox modes based on task complexity and risk
-4. **Safety first**: For production environments, recommended to use `read-only` sandbox mode
+3. **Choose appropriate execution mode**: Select suitable execution and
+   sandbox modes based on task complexity and risk
+4. **Safety first**: For production environments, recommended to use
+   `read-only` sandbox mode
 
 ## Example Usage
 
@@ -443,7 +458,8 @@ Check the `status` field in returned JSON to determine execution result.
 ## Prerequisites
 
 1. Install OpenAI Codex CLI: `npm install -g @openai/codex`
-2. Optional: Set `ANTHROPIC_API_KEY` environment variable to enable metacognitive optimization
+2. Optional: Set `ANTHROPIC_API_KEY` environment variable to enable
+   metacognitive optimization
 """
 
 
@@ -458,7 +474,8 @@ def get_best_practices() -> str:
 ## Task Description Writing Tips
 
 ### ✅ Good Task Descriptions
-- **Specific and clear**: "Add a validate_email method to the User class to verify email format"
+- **Specific and clear**: "Add a validate_email method to the User class to
+  verify email format"
 - **Scope defined**: "Refactor all authentication-related functions in src/auth.py"
 - **Clear objective**: "Add boundary condition tests for calculate_tax function"
 
@@ -565,7 +582,8 @@ def refactor_code(file_path: str, refactor_type: str = "general") -> list:
 
     Args:
         file_path: The path to the file to be refactored
-        refactor_type: The type of refactoring (general, performance, readability, structure)
+        refactor_type: The type of refactoring (general, performance,
+            readability, structure)
     """
     refactor_descriptions = {
         "general": "Perform general code refactoring to improve code quality",
@@ -576,14 +594,19 @@ def refactor_code(file_path: str, refactor_type: str = "general") -> list:
 
     description = refactor_descriptions.get(refactor_type, "Refactor code")
 
-    task_description = f"Please {description} for the file '{file_path}'. Keep the original functionality unchanged, but improve code quality, readability, and maintainability."
+    task_description = (
+        f"Please {description} for the file '{file_path}'. Keep the original "
+        f"functionality unchanged, but improve code quality, readability, and "
+        f"maintainability."
+    )
 
     return [
         UserMessage(f"I will refactor the {file_path} file for you."),
         UserMessage(f"Refactoring type: {refactor_type}"),
         UserMessage(f"Task: {task_description}"),
         UserMessage(
-            "Please ensure the working directory is set correctly before calling the codex_delegate tool."
+            "Please ensure the working directory is set correctly before "
+            "calling the codex_delegate tool."
         ),
     ]
 
@@ -597,23 +620,27 @@ def generate_tests(file_path: str, test_framework: str = "pytest") -> list:
         file_path: The path to the file for which to generate tests
         test_framework: The testing framework (pytest, unittest, jest, etc.)
     """
-    task_description = f"""Generate comprehensive {test_framework} test cases for file '{file_path}'.
-
-Requirements:
-1. Cover all public functions and methods
-2. Include normal cases and edge condition tests
-3. Add exception handling tests
-4. Ensure test cases are clear and well-described
-5. Follow {test_framework} best practices"""
+    task_description = (
+        f"Generate comprehensive {test_framework} test cases for file "
+        f"'{file_path}'.\\n\\n"
+        f"Requirements:\\n"
+        f"1. Cover all public functions and methods\\n"
+        f"2. Include normal cases and edge condition tests\\n"
+        f"3. Add exception handling tests\\n"
+        f"4. Ensure test cases are clear and well-described\\n"
+        f"5. Follow {test_framework} best practices"
+    )
 
     return [
         UserMessage(f"I will generate {test_framework} test cases for {file_path}."),
         UserMessage(
-            "This will include comprehensive test coverage, including edge cases and exception scenarios."
+            "This will include comprehensive test coverage, including edge "
+            "cases and exception scenarios."
         ),
         UserMessage(f"Task description: {task_description}"),
         UserMessage(
-            "Please call the codex_delegate tool after setting the correct working directory."
+            "Please call the codex_delegate tool after setting the correct "
+            "working directory."
         ),
     ]
 

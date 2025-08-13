@@ -1,7 +1,8 @@
 """
 Cache Module
 
-Provides result caching functionality to improve performance and avoid duplicate execution of same tasks.
+Provides result caching functionality to improve performance and avoid
+duplicate execution of same tasks.
 """
 
 import hashlib
@@ -15,7 +16,8 @@ class ResultCache:
     """
     Memory-based result caching system.
 
-    Uses task description, file content hash, and execution parameters to generate cache keys,
+    Uses task description, file content hash, and execution parameters to
+    generate cache keys,
     avoiding duplicate execution of same Codex tasks.
     """
 
