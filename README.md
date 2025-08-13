@@ -57,23 +57,37 @@ graph TD
 ### Prerequisites
 
 1. **Python 3.11+**
-2. **uv Package Manager**: `curl -LsSf https://astral.sh/uv/install.sh | sh`
-3. **OpenAI Codex CLI**: `npm install -g @openai/codex`
+2. **OpenAI Codex CLI**: `npm install -g @openai/codex`
 
 ### Installation
 
-1. **Clone the project**
+#### From PyPI (Recommended)
+
+```bash
+pip install claude-codex-bridge
+```
+
+#### From Source
+
+1. **uv Package Manager** (if building from source): `curl -LsSf https://astral.sh/uv/install.sh | sh`
+
+2. **Clone the project**
    ```bash
    git clone https://github.com/xiaocang/claude-codex-bridge.git 
    cd claude-codex-bridge
    ```
 
-2. **Install dependencies**
+3. **Install dependencies**
    ```bash
    uv sync
    ```
 
-3. **Configure environment variables** (optional)
+   Or with pip:
+   ```bash
+   pip install -e .
+   ```
+
+4. **Configure environment variables** (optional)
    ```bash
    # Copy environment variable template
    cp .env.example .env
@@ -82,17 +96,41 @@ graph TD
    vim .env
    ```
 
-4. **Start the server**
-   ```bash
-   uv run src/bridge_server.py
-   ```
+### Starting the Server
+
+After installation, you can start the server using one of these methods:
+
+**If installed from PyPI:**
+```bash
+claude-codex-bridge
+```
+
+**Or using Python module:**
+```bash
+python -m claude_codex_bridge
+```
+
+**If running from source:**
+```bash
+uv run python -m claude_codex_bridge
+# Or directly:
+uv run src/claude_codex_bridge/bridge_server.py
+```
 
 ### Claude Code Integration
 
 1. **Configure MCP Server**
+   
+   If installed from PyPI:
    ```bash
    # In your project directory
-   claude mcp add codex-bridge --command "uv run /path/to/claude-codex-bridge/src/bridge_server.py" --scope project
+   claude mcp add codex-bridge --command "claude-codex-bridge" --scope project
+   ```
+   
+   Or if running from source:
+   ```bash
+   # In your project directory
+   claude mcp add codex-bridge --command "python -m claude_codex_bridge" --scope project
    ```
 
 2. **Use Tools**
@@ -172,7 +210,9 @@ uv run python -m pytest tests/test_cache.py
 
 ```bash
 # Debug with MCP Inspector
-uv run mcp dev src/bridge_server.py
+uv run mcp dev src/claude_codex_bridge/bridge_server.py
+# Or if installed
+mcp dev claude-codex-bridge
 ```
 
 ### Code Quality
@@ -193,9 +233,12 @@ uv run flake8 src/ tests/
 ```
 claude-codex-bridge/
 ├── src/
-│   ├── bridge_server.py    # Main MCP server
-│   ├── engine.py          # Delegation Decision Engine
-│   └── cache.py           # Result caching system
+│   └── claude_codex_bridge/
+│       ├── __init__.py       # Package initialization
+│       ├── __main__.py       # Entry point
+│       ├── bridge_server.py # Main MCP server
+│       ├── engine.py        # Delegation Decision Engine
+│       └── cache.py         # Result caching system
 ├── tests/
 │   ├── test_engine.py     # Engine unit tests
 │   └── test_cache.py      # Cache unit tests

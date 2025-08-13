@@ -107,11 +107,10 @@ wheels = [
 [[package]]
 name = "claude-codex-bridge"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "mcp", extra = ["cli"] },
-    { name = "pytest" },
 ]
 
 [package.dev-dependencies]
@@ -120,6 +119,7 @@ dev = [
     { name = "black" },
     { name = "flake8" },
     { name = "mypy" },
+    { name = "pytest" },
     { name = "pytest-cov" },
 ]
 
@@ -127,7 +127,6 @@ dev = [
 requires-dist = [
     { name = "anthropic", specifier = ">=0.63.0" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.12.4" },
-    { name = "pytest", specifier = ">=8.4.1" },
 ]
 
 [package.metadata.requires-dev]
@@ -136,6 +135,7 @@ dev = [
     { name = "black", specifier = ">=24.0.0" },
     { name = "flake8", specifier = ">=7.0.0" },
     { name = "mypy", specifier = ">=1.8.0" },
+    { name = "pytest", specifier = ">=8.4.1" },
     { name = "pytest-cov", specifier = ">=4.1.0" },
 ]
 
