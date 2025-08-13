@@ -3,17 +3,17 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "claude-codex-bridge"
+name = "claude_codex_bridge"
 version = "0.1.0"
 description = "An intelligent MCP server for orchestrating task delegation between Claude and OpenAI Codex CLI"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
-    {name = "xiaocang", email = "your-email@example.com"},
+    {name = "xiaocang", email = "johnnywang1991@msn.com"},
 ]
 maintainers = [
-    {name = "xiaocang", email = "your-email@example.com"},
+    {name = "xiaocang", email = "johnnywang1991@msn.com"},
 ]
 keywords = ["mcp", "claude", "codex", "ai", "llm", "automation", "code-generation"]
 classifiers = [
