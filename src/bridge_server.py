@@ -216,6 +216,7 @@ async def codex_delegate(
 
     # 4. Prepare Codex instruction
     codex_prompt = dde.prepare_codex_prompt(task_description)
+    optimization_note = None  # Will be used for metacognitive optimization in future
 
     try:
         # 5. Invoke Codex CLI
@@ -273,7 +274,7 @@ async def codex_delegate(
             "working_directory": working_directory,
             "execution_mode": execution_mode,
             "sandbox_mode": sandbox_mode,
-            "optimization_note": optimization_note,
+            "optimization_note": None,  # No optimization applied on error
         }
         return json.dumps(error_result, indent=2, ensure_ascii=False)
 
