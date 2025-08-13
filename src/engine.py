@@ -12,7 +12,7 @@ class DelegationDecisionEngine:
     Analyzes tasks and decides whether and how to delegate to Codex CLI.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         pass
 
     def should_delegate(self, task_description: str) -> bool:

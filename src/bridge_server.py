@@ -6,7 +6,7 @@ An intelligent bridge MCP server for orchestrating task delegation between Claud
 
 import asyncio
 import json
-from typing import Literal, Optional, Tuple
+from typing import Literal, Tuple
 
 from mcp.server.fastmcp import FastMCP
 
@@ -77,6 +77,7 @@ async def invoke_codex_cli(
     # Add prompt as final positional argument
     command.append(prompt)
 
+    process = None
     try:
         # Execute subprocess asynchronously
         process = await asyncio.create_subprocess_exec(
@@ -102,7 +103,7 @@ async def invoke_codex_cli(
 
     except asyncio.TimeoutError:
         # Timeout handling
-        if "process" in locals():
+        if process is not None:
             try:
                 process.terminate()
                 await asyncio.wait_for(process.wait(), timeout=5)
@@ -274,7 +275,7 @@ async def codex_delegate(
             "working_directory": working_directory,
             "execution_mode": execution_mode,
             "sandbox_mode": sandbox_mode,
-            "optimization_note": None,  # No optimization applied on error
+            "optimization_note": "",  # No optimization applied on error
         }
         return json.dumps(error_result, indent=2, ensure_ascii=False)
 
@@ -550,9 +551,11 @@ try:
     from mcp.server.fastmcp.messages import UserMessage
 except ImportError:
     # Try alternative import path or use a simple dict alternative
-    class UserMessage:
-        def __init__(self, content):
+    class FallbackUserMessage:
+        def __init__(self, content: str) -> None:
             self.content = content
+
+    UserMessage = FallbackUserMessage
 
 
 @mcp.prompt()
@@ -578,7 +581,7 @@ def refactor_code(file_path: str, refactor_type: str = "general") -> list:
     return [
         UserMessage(f"I will refactor the {file_path} file for you."),
         UserMessage(f"Refactoring type: {refactor_type}"),
-        UserMessage(f"Task: {description}"),
+        UserMessage(f"Task: {task_description}"),
         UserMessage(
             "Please ensure the working directory is set correctly before calling the codex_delegate tool."
         ),
