@@ -41,7 +41,7 @@ Documentation = "https://github.com/xiaocang/claude-codex-bridge#readme"
 Repository = "https://github.com/xiaocang/claude-codex-bridge.git"
 Issues = "https://github.com/xiaocang/claude-codex-bridge/issues"
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest>=8.4.1",
     "black>=24.0.0",
