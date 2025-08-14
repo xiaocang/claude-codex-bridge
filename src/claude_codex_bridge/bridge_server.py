@@ -8,7 +8,7 @@ between Claude and OpenAI Codex CLI.
 import asyncio
 import json
 import os
-from typing import Literal, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 from mcp.server.fastmcp import FastMCP
 
@@ -23,18 +23,29 @@ except ImportError:
 # Initialize FastMCP instance
 mcp = FastMCP(
     name="claude-codex-bridge",
-    instructions="An intelligent MCP server for orchestrating task delegation "
-    "between Claude and Codex CLI.",
+    instructions="""An intelligent MCP server that leverages Codex's exceptional
+capabilities in code analysis, architectural planning, and complex problem-solving.
+
+Codex excels at:
+• Deep code comprehension and analysis
+• Architectural design and system planning
+• Breaking down complex problems into actionable steps
+• Generating comprehensive test strategies
+• Code review and optimization suggestions
+
+By default, operates in read-only mode for safety. Enable write mode with --allow-write
+when you're ready to apply Codex's recommendations.""",
 )
 
 # Initialize Delegation Decision Engine
 dde = DelegationDecisionEngine()
 
 # Initialize result cache
-
 cache_ttl = int(os.environ.get("CACHE_TTL", "3600"))  # Default 1 hour
 cache_max_size = int(os.environ.get("MAX_CACHE_SIZE", "100"))  # Default 100 entries
 result_cache = ResultCache(ttl=cache_ttl, max_size=cache_max_size)
+
+# Write operations will be checked dynamically in codex_delegate function
 
 
 async def invoke_codex_cli(
@@ -42,6 +53,7 @@ async def invoke_codex_cli(
     working_directory: str,
     execution_mode: str,
     sandbox_mode: str,
+    allow_write: bool = True,
     timeout: int = 300,  # 5 minute timeout
 ) -> Tuple[str, str]:
     """
@@ -52,6 +64,7 @@ async def invoke_codex_cli(
         working_directory: Codex working directory
         execution_mode: Codex CLI approval strategy mode
         sandbox_mode: Codex CLI sandbox strategy mode
+        allow_write: Whether to allow file write operations
         timeout: Command timeout in seconds
 
     Returns:
@@ -67,14 +80,26 @@ async def invoke_codex_cli(
     # Always specify working directory (critical)
     command.extend(["-C", working_directory])
 
+    # Configure file write permissions through sandbox_permissions
+    if not allow_write:
+        # Disable file operations by using empty sandbox_permissions
+        command.extend(["-c", "sandbox_permissions=[]"])
+
     # Use convenience mode or specify parameters separately
-    if execution_mode == "on-failure" and sandbox_mode == "workspace-write":
-        # Use convenient --full-auto mode
+    if (
+        execution_mode == "on-failure"
+        and sandbox_mode == "workspace-write"
+        and allow_write
+    ):
+        # Use convenient --full-auto mode (only when write is allowed)
         command.append("--full-auto")
     else:
-        # Specify approval and sandbox modes separately
-        command.extend(["-a", execution_mode])
+        # Specify sandbox mode only (approval mode not available for exec subcommand)
         command.extend(["-s", sandbox_mode])
+
+    # Add delimiter to ensure any leading dashes in prompt
+    # are treated as positional text, not CLI flags
+    command.append("--")
 
     # Add prompt as final positional argument
     command.append(prompt)
@@ -171,37 +196,69 @@ async def codex_delegate(
     output_format: Literal["diff", "full_file", "explanation"] = "diff",
 ) -> str:
     """
-    Delegate complex coding tasks to the OpenAI Codex CLI.
+    Leverage Codex's advanced analytical capabilities for code comprehension and
+    planning.
 
-    Use this tool when you need to refactor code, fix bugs, generate new
-    functions, add tests, or explain code snippets. It provides a structured
-    way to interact with the local file system and leverage Codex's powerful
-    coding capabilities.
+    Codex specializes in:
+    • Analyzing complex codebases and identifying improvement opportunities
+    • Designing architectural solutions and refactoring strategies
+    • Planning implementation approaches for new features
+    • Generating comprehensive test strategies
+    • Reviewing code for quality, security, and performance issues
+
+    By default, operates in read-only mode to focus on analysis and planning.
+    Enable write mode with --allow-write flag when ready to apply changes.
 
     Args:
-        task_description: A detailed, natural language description of the
-            task to delegate to Codex.
-        working_directory: The path to the project's working directory where
-            Codex will operate.
-        execution_mode: The approval policy mode for the Codex CLI.
-        sandbox_mode: The sandbox policy mode for the Codex CLI.
-        output_format: The expected format of the result.
+        task_description: Describe what you want Codex to analyze or plan
+        working_directory: Project directory to analyze
+        execution_mode: Approval strategy (default: on-failure)
+        sandbox_mode: File access mode (forced to read-only unless --allow-write)
+        output_format: How to format the analysis results
 
     Returns:
-        A JSON string containing the result of the task execution.
+        Detailed analysis, recommendations, or implementation plan
     """
     # 1. Validate working directory
     if not dde.validate_working_directory(working_directory):
-        error_result = {
+        error_result: Dict[str, Any] = {
             "status": "error",
             "message": f"Invalid or unsafe working directory: {working_directory}",
             "error_type": "invalid_directory",
         }
         return json.dumps(error_result, indent=2, ensure_ascii=False)
 
-    # 2. Check cache
+    # 2. Enforce read-only mode if write is not allowed
+    effective_sandbox_mode = sandbox_mode
+    mode_notice: Optional[Dict[str, Union[str, List[str]]]] = None
+
+    # Check if write operations are allowed (default: False for safety)
+    allow_write = os.environ.get("CODEX_ALLOW_WRITE", "false").lower() == "true"
+
+    if not allow_write and sandbox_mode != "read-only":
+        effective_sandbox_mode = "read-only"
+        mode_notice = {
+            "mode": "planning",
+            "description": "Operating in planning and analysis mode (read-only)",
+            "message": (
+                "Codex will analyze your code and provide detailed "
+                "recommendations without modifying files."
+            ),
+            "hint": "To apply changes, restart the server with --allow-write flag",
+            "benefits": [
+                "Safe exploration of solutions",
+                "Comprehensive analysis without risk",
+                "Thoughtful planning before execution",
+            ],
+        }
+
+    # 3. Check cache
     cached_result = result_cache.get(
-        task_description, working_directory, execution_mode, sandbox_mode, output_format
+        task_description,
+        working_directory,
+        execution_mode,
+        effective_sandbox_mode,
+        output_format,
     )
     if cached_result:
         # Parse cached result and add cache flag
@@ -230,7 +287,11 @@ async def codex_delegate(
     try:
         # 5. Invoke Codex CLI
         stdout, stderr = await invoke_codex_cli(
-            codex_prompt, working_directory, execution_mode, sandbox_mode
+            codex_prompt,
+            working_directory,
+            execution_mode,
+            effective_sandbox_mode,
+            allow_write,
         )
 
         # 6. Parse output
@@ -241,7 +302,8 @@ async def codex_delegate(
             {
                 "working_directory": working_directory,
                 "execution_mode": execution_mode,
-                "sandbox_mode": sandbox_mode,
+                "sandbox_mode": effective_sandbox_mode,
+                "requested_sandbox_mode": sandbox_mode,
                 "optimization_note": optimization_note,
                 "original_task": task_description,
                 "codex_prompt": (
@@ -249,6 +311,10 @@ async def codex_delegate(
                 ),
             }
         )
+
+        # Add operation mode notice if applicable
+        if mode_notice:
+            result["operation_mode"] = mode_notice
 
         # If there is stderr, include it as well
         if stderr.strip():
@@ -264,7 +330,7 @@ async def codex_delegate(
                 task_description,
                 working_directory,
                 execution_mode,
-                sandbox_mode,
+                effective_sandbox_mode,
                 output_format,
                 result_json,
             )
@@ -282,9 +348,15 @@ async def codex_delegate(
             "error_type": type(e).__name__,
             "working_directory": working_directory,
             "execution_mode": execution_mode,
-            "sandbox_mode": sandbox_mode,
+            "sandbox_mode": effective_sandbox_mode,
+            "requested_sandbox_mode": sandbox_mode,
             "optimization_note": "",  # No optimization applied on error
         }
+
+        # Add operation mode notice if applicable
+        if mode_notice:
+            error_result["operation_mode"] = mode_notice
+
         return json.dumps(error_result, indent=2, ensure_ascii=False)
 
 
@@ -351,52 +423,111 @@ def get_usage_guide() -> str:
     Return the usage guide documentation for Claude-Codex Bridge.
     """
     return """
-# Claude-Codex Bridge Usage Guide
+# Claude-Codex Bridge - Intelligent Code Analysis & Planning Tool
 
-Claude-Codex Bridge is an intelligent MCP server for orchestrating task
-delegation between Claude and OpenAI Codex CLI.
+## Core Philosophy
+Codex excels at understanding, analyzing, and planning - not just executing.
+This bridge leverages Codex's unique strengths:
 
-## Basic Usage
+### 🧠 Deep Analysis
+- Understand complex code relationships
+- Identify architectural patterns and anti-patterns
+- Analyze performance bottlenecks
 
-### Calling the codex_delegate tool
+### 📋 Strategic Planning
+- Design refactoring strategies
+- Plan feature implementations
+- Create test strategies
 
+### 🔍 Code Review
+- Security vulnerability assessment
+- Code quality evaluation
+- Best practices recommendations
+
+## Default Read-Only Mode
+For safety and thoughtful development, the bridge operates in read-only mode by default.
+
+### Benefits of Planning Mode:
+1. **Risk-Free Analysis**: Explore solutions without modifying code
+2. **Comprehensive Understanding**: Deep dive into codebase structure
+3. **Better Decisions**: Plan thoroughly before execution
+4. **Learning Opportunity**: Understand WHY changes are needed
+
+## Recommended Workflow
+
+### Step 1: Analyze (Read-Only)
+```bash
+# Start in default planning mode
+uv run -m claude_codex_bridge
 ```
+Ask Codex to:
+- "Analyze the authentication system for security vulnerabilities"
+- "Review the database layer for performance improvements"
+- "Suggest architectural improvements for scalability"
+
+### Step 2: Plan (Read-Only)
+Review Codex's analysis and ask for specific plans:
+- "Design a migration strategy for the suggested improvements"
+- "Create a test plan for the refactoring"
+
+### Step 3: Execute (Write Mode)
+When ready to apply changes:
+```bash
+# Enable write mode
+uv run -m claude_codex_bridge --allow-write
+```
+
+## Tool Usage
+
+### Planning Mode (Default)
+```python
 codex_delegate(
-    task_description="Your task description",
+    task_description="Analyze the user authentication system for security
+                     vulnerabilities",
     working_directory="/path/to/your/project",
-    execution_mode="on-failure",      # optional
-    sandbox_mode="workspace-write",   # optional
-    output_format="diff"              # optional
+    execution_mode="on-failure",
+    sandbox_mode="read-only",      # Enforced automatically
+    output_format="explanation"
+)
+```
+
+### Execution Mode (--allow-write)
+```python
+codex_delegate(
+    task_description="Implement the planned security improvements",
+    working_directory="/path/to/your/project",
+    execution_mode="on-failure",
+    sandbox_mode="workspace-write",  # Now allowed
+    output_format="diff"
 )
 ```
 
 ### Parameter Explanation
 
 **task_description** (required)
-- Detailed natural language description of the task to delegate to Codex
-- Example: "Refactor main.py file by extracting all functions into a
-  new class named Utils"
+- Describe what you want Codex to analyze or plan
+- Planning examples: "Analyze authentication security" or "Design refactoring strategy"
+- Implementation examples: "Apply the planned security improvements"
 
 **working_directory** (required)
-- Absolute path to project working directory
-- Codex will work and access files in this directory
+- Absolute path to project directory to analyze
 - Example: "/Users/username/my-project"
 
 **execution_mode** (optional, default: "on-failure")
-- `untrusted`: Only run trusted commands
-- `on-failure`: Request approval only on failure
+- `untrusted`: Only run trusted commands (safest for analysis)
+- `on-failure`: Request approval only on failure (recommended)
 - `on-request`: Model decides when to request approval
-- `never`: Never request approval
+- `never`: Never request approval (use with caution)
 
 **sandbox_mode** (optional, default: "workspace-write")
-- `read-only`: Read-only filesystem access
-- `workspace-write`: Writable workspace files
-- `danger-full-access`: Full system access (dangerous)
+- `read-only`: Read-only access (automatically enforced unless --allow-write)
+- `workspace-write`: Writable workspace (only available with --allow-write)
+- `danger-full-access`: Full system access (dangerous, requires --allow-write)
 
 **output_format** (optional, default: "diff")
-- `diff`: Returns changes in patch format
-- `full_file`: Returns complete modified file content
-- `explanation`: Returns natural language explanation
+- `explanation`: Natural language analysis and recommendations (best for planning)
+- `diff`: Changes in patch format (useful for implementation)
+- `full_file`: Complete modified file content
 
 ## Advanced Features
 
@@ -411,38 +542,75 @@ code blocks, or explanation text) and labels them in responses.
 
 ## Best Practices
 
-1. **Clear task objectives**: Clearly state "what" you want done, not "how"
-2. **Provide full paths**: Always use absolute paths for working directories
-3. **Choose appropriate execution mode**: Select suitable execution and
-   sandbox modes based on task complexity and risk
-4. **Safety first**: For production environments, recommended to use
-   `read-only` sandbox mode
+### Planning-First Approach
+1. **Start with Analysis**: Begin in read-only mode to understand before acting
+2. **Ask Strategic Questions**: Focus on "what patterns exist?" and
+   "what could be improved?"
+3. **Plan Comprehensively**: Design solutions before implementing them
+4. **Review Before Executing**: Examine Codex's recommendations carefully
+
+### Task Description Guidelines
+1. **Planning Phase**: "Analyze X for Y" or "Design strategy for Z"
+2. **Implementation Phase**: "Apply the planned improvements" or
+   "Implement the designed solution"
+3. **Be Specific**: State clear objectives and scope
+4. **Provide Context**: Include relevant constraints and requirements
+
+### Safety and Security
+1. **Default to Read-Only**: Use planning mode by default for safety
+2. **Absolute Paths**: Always use full paths for working directories
+3. **Enable Write Carefully**: Only use --allow-write when ready to apply changes
+4. **Validate Results**: Test thoroughly after applying modifications
 
 ## Example Usage
 
-### Code Refactoring
+### Security Analysis Workflow
+
+**Step 1: Analysis (Planning Mode)**
 ```
-task_description: "Refactor all functions in src/utils.py to use async/await syntax"
-working_directory: "/Users/username/my-python-project"
+task_description: "Analyze the authentication system for security vulnerabilities"
+working_directory: "/Users/username/my-web-app"
 execution_mode: "on-failure"
-sandbox_mode: "workspace-write"
+sandbox_mode: "read-only"  # Automatically enforced
+output_format: "explanation"
 ```
 
-### Test Generation
+**Step 2: Planning (Planning Mode)**
 ```
-task_description: "Generate complete unit tests for the User class in models/user.py"
+task_description: "Design security improvements for the identified vulnerabilities"
+working_directory: "/Users/username/my-web-app"
+execution_mode: "on-failure"
+sandbox_mode: "read-only"  # Automatically enforced
+output_format: "explanation"
+```
+
+**Step 3: Implementation (Execution Mode - requires --allow-write)**
+```
+task_description: "Implement the planned security improvements"
+working_directory: "/Users/username/my-web-app"
+execution_mode: "on-failure"
+sandbox_mode: "workspace-write"  # Now allowed
+output_format: "diff"
+```
+
+### Performance Optimization Example
+
+**Analysis Phase:**
+```
+task_description: "Analyze the database queries for performance bottlenecks"
 working_directory: "/Users/username/my-django-project"
-execution_mode: "on-request"
-sandbox_mode: "workspace-write"
-```
-
-### Code Explanation
-```
-task_description: "Explain the sorting algorithm implementation in algorithm.py"
-working_directory: "/Users/username/algorithms"
-execution_mode: "untrusted"
+execution_mode: "on-failure"
 sandbox_mode: "read-only"
 output_format: "explanation"
+```
+
+**Implementation Phase:**
+```
+task_description: "Apply the designed query optimizations"
+working_directory: "/Users/username/my-django-project"
+execution_mode: "on-failure"
+sandbox_mode: "workspace-write"
+output_format: "diff"
 ```
 
 ## Error Handling
@@ -466,101 +634,133 @@ Check the `status` field in returned JSON to determine execution result.
 @mcp.resource("bridge://docs/best_practices")
 def get_best_practices() -> str:
     """
-    Returns best practices for writing effective Codex delegation instructions.
+    Returns best practices for effective planning-first development with Codex.
     """
     return """
-# Codex Delegation Task Best Practices
+# Best Practices for Codex Planning & Analysis
 
-## Task Description Writing Tips
+## Embrace the Planning-First Philosophy
 
-### ✅ Good Task Descriptions
-- **Specific and clear**: "Add a validate_email method to the User class to
-  verify email format"
-- **Scope defined**: "Refactor all authentication-related functions in src/auth.py"
-- **Clear objective**: "Add boundary condition tests for calculate_tax function"
+Codex excels at analysis and strategic thinking. Use this strength by following
+a structured approach: Analyze → Plan → Execute.
 
-### ❌ Descriptions to Avoid
-- **Too vague**: "Improve the code"
-- **Too broad**: "Fix all issues in the project"
-- **No context**: "Add new feature"
+## Task Description Excellence
 
-## Execution Mode Selection
+### ✅ Planning Phase Requests
+- **Analysis**: "Analyze the authentication system for security vulnerabilities"
+- **Evaluation**: "Review the API design for RESTful best practices"
+- **Assessment**: "Evaluate the database schema for normalization issues"
+- **Strategy**: "Design a migration plan from monolithic to microservices architecture"
 
-### untrusted (Safest)
-- Use case: Code analysis, documentation generation, read-only operations
-- Pros: Highest security
-- Cons: Limited functionality
+### ✅ Implementation Phase Requests
+- **Specific**: "Implement the planned security improvements for authentication"
+- **Targeted**: "Apply the designed API restructuring to user endpoints"
+- **Phased**: "Execute phase 1 of the database normalization plan"
 
-### on-failure (Recommended)
-- Use case: Most development tasks
-- Pros: Balanced security and efficiency
-- Requests approval when failing
+### ❌ Requests to Avoid
+- **Too vague**: "Improve the code" → What specifically needs improvement?
+- **Too broad**: "Fix all issues" → Start with analysis to identify issues
+- **No context**: "Add new feature" → Plan the feature design first
 
-### on-request (Flexible)
-- Use case: Complex tasks requiring human judgment
-- Codex requests approval when needed
+## Operational Mode Selection
 
-### never (High risk)
-- Use case: Fully automated simple tasks
-- Note: Requires complete trust in Codex's judgment
+### Planning Mode (Default - No --allow-write flag)
+- **Use case**: Analysis, planning, strategy design, code review
+- **Benefits**: Risk-free exploration, comprehensive understanding, better decisions
+- **Sandbox**: Automatically enforced read-only mode
+- **Best for**: Understanding problems before solving them
 
-## Sandbox Mode Selection
+### Execution Mode (Requires --allow-write flag)
+- **Use case**: Implementing planned solutions, applying designed changes
+- **Benefits**: Execute well-planned modifications with confidence
+- **Sandbox**: workspace-write or danger-full-access available
+- **Best for**: Applying solutions you've already planned and reviewed
 
-### read-only (Safest)
-- For code analysis, explanation, documentation generation
-- Won't modify any files
+## Workflow Best Practices
 
-### workspace-write (Recommended)
-- Can modify files in workspace
-- Suitable for most development tasks
+### 1. Always Start with Planning
+```
+❌ Direct Implementation: "Add user authentication to the app"
+✅ Planning First:
+   - "Analyze current authentication patterns in the codebase"
+   - "Design a secure authentication strategy"
+   - "Plan implementation steps for authentication"
+   - Then: "Implement the planned authentication system"
+```
 
-### danger-full-access (Dangerous)
-- Full filesystem access
-- Use only in special cases
+### 2. Break Down Complex Analysis
+```
+❌ Too Broad: "Analyze the entire application"
+✅ Focused Analysis:
+   - "Analyze the data layer for performance bottlenecks"
+   - "Evaluate API endpoints for security vulnerabilities"
+   - "Review frontend components for accessibility compliance"
+```
 
-## Success Rate Improvement Tips
+### 3. Strategic Planning Questions
+```
+✅ Architecture: "What architectural patterns would improve scalability?"
+✅ Performance: "Which components are performance bottlenecks and why?"
+✅ Security: "What are the security vulnerabilities and their impact?"
+✅ Quality: "What code quality issues affect maintainability?"
+```
 
-1. **Break down complex tasks**
-   ```
-   ❌ "Rewrite the entire user management system"
-   ✅ "Refactor create_user function in user.py for better readability"
-   ```
+## Execution Strategies
 
-2. **Provide specific file paths**
-   ```
-   ❌ "Modify configuration file"
-   ✅ "Modify database connection settings in config/settings.py"
-   ```
+### When to Enable Write Mode
+1. **After thorough planning**: You have a clear plan from Codex's analysis
+2. **Specific implementations**: You're ready to apply specific, planned changes
+3. **Phased execution**: Implementing one phase of a larger plan
+4. **With clear scope**: You understand exactly what will be modified
 
-3. **Specify expected outcomes**
-   ```
-   ❌ "Optimize the code"
-   ✅ "Optimize process_data function to reduce memory usage"
-   ```
+### Implementation Best Practices
+1. **Reference the Plan**: "Implement the security improvements we planned earlier"
+2. **Specific Scope**: "Apply the database optimizations to the user queries module"
+3. **Phased Approach**: "Execute phase 1 of the authentication refactoring plan"
+4. **Include Context**: "Apply the planned changes while maintaining
+   backward compatibility"
 
-4. **Include necessary constraints**
-   ```
-   Example: "Add input validation while ensuring Python 3.8+ compatibility"
-   ```
+## Example Workflow: Security Hardening
 
-## Working Directory Best Practices
+### Phase 1: Analysis (Planning Mode)
+```
+"Analyze all API endpoints for security vulnerabilities"
+```
 
-- Use absolute paths
-- Ensure directory exists and is accessible
-- Avoid system directories (/etc, /usr/bin etc.)
-- Regularly clean temporary files
+### Phase 2: Strategy (Planning Mode)
+```
+"Design comprehensive security improvements for the identified vulnerabilities"
+```
 
-## Error Handling
+### Phase 3: Implementation (Execution Mode)
+```
+"Implement the planned security improvements for the authentication endpoints"
+```
 
-- Check returned `status` field
-- Read `error_type` and `message` for details
-- For timeout errors, consider breaking down tasks or increasing timeout
+### Phase 4: Validation (Planning Mode)
+```
+"Review the implemented security changes for completeness and effectiveness"
+```
 
-## Performance Optimization
+## Safety Guidelines
 
-- Consider longer timeout for complex tasks
-- Enable metacognition optimization to improve instruction quality
-- Use caching mechanism to avoid repeating identical tasks
+### Working Directory Security
+- Use absolute paths only
+- Ensure directories exist and are accessible
+- Avoid system directories (/etc, /usr/bin, etc.)
+- Test in development environments first
+
+### Error Handling
+- Check the `status` field in responses
+- Review `operation_mode` notices for mode information
+- Read `error_type` and `message` for troubleshooting details
+- Use planning mode to understand issues before fixing
+
+### Performance Tips
+- Use planning mode for complex analysis (cheaper and safer)
+- Cache results by using consistent task descriptions
+- Break large tasks into focused analysis sessions
+- Enable write mode only when ready to implement planned changes
 """
 
 

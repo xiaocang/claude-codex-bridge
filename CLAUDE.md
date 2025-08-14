@@ -169,3 +169,5 @@ The project uses pytest with comprehensive unit tests covering:
 - `danger-full-access`: Use with extreme caution
 
 **Path Security**: Always use absolute paths, validate directory existence and permissions
+
+- write code, comments, and string const, with English, always

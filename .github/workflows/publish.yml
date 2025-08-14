@@ -1,0 +1,252 @@
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - 'v*'  # Test PyPI on version tags
+  release:
+    types: [published]  # Production PyPI on GitHub releases
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Deployment target'
+        required: true
+        default: 'testpypi'
+        type: choice
+        options:
+          - testpypi
+          - pypi
+
+permissions:
+  contents: read
+  id-token: write  # For trusted publishing
+  attestations: write  # For supply chain security
+
+jobs:
+  # Job 1: Quality checks before build
+  quality-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run quality checks
+        run: |
+          uv run black --check --diff src/ tests/
+          uv run mypy src/
+          uv run flake8 src/ tests/
+          uv run python -m pytest tests/ -v
+          uv run bandit -r src/
+
+  # Job 2: Build distributions
+  build:
+    needs: quality-check
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract.outputs.version }}
+      hash-sdist: ${{ steps.hash.outputs.hash-sdist }}
+      hash-wheel: ${{ steps.hash.outputs.hash-wheel }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # For version detection
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Extract version
+        id: extract
+        run: |
+          VERSION=$(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "📦 Building version: ${VERSION}"
+
+      - name: Validate version tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          PROJECT_VERSION=${{ steps.extract.outputs.version }}
+          if [ "$TAG_VERSION" != "$PROJECT_VERSION" ]; then
+            echo "❌ Tag version ($TAG_VERSION) doesn't match project version ($PROJECT_VERSION)"
+            exit 1
+          fi
+          echo "✅ Version validated: $PROJECT_VERSION"
+
+      - name: Build distributions
+        run: |
+          uv build
+          ls -la dist/
+
+      - name: Generate checksums
+        id: hash
+        run: |
+          cd dist
+          sha256sum *.tar.gz > checksums.txt
+          sha256sum *.whl >> checksums.txt
+          echo "hash-sdist=$(sha256sum *.tar.gz | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          echo "hash-wheel=$(sha256sum *.whl | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          cat checksums.txt
+
+      - name: Verify distributions
+        run: |
+          uv run python -m pip install --no-deps dist/*.whl
+          uv run python -c "import claude_codex_bridge; print(f'✅ Import successful: {claude_codex_bridge.__version__}')"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/
+          retention-days: 7
+
+  # Job 3: Publish to Test PyPI
+  publish-testpypi:
+    if: |
+      github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') ||
+      github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'testpypi'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/claude-codex-bridge/${{ needs.build.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Publish to Test PyPI (Trusted Publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+          print-hash: true
+          attestations: true
+        continue-on-error: true
+        id: trusted-publish
+
+      - name: Publish to Test PyPI (Token Fallback)
+        if: steps.trusted-publish.outcome == 'failure'
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.TEST_PYPI_API_TOKEN }}
+        run: |
+          uv publish \
+            --publish-url https://test.pypi.org/legacy/ \
+            --token $UV_PUBLISH_TOKEN
+
+      - name: Verify installation from Test PyPI
+        run: |
+          sleep 30  # Wait for package to be available
+          uv pip install --index-url https://test.pypi.org/simple/ \
+            --extra-index-url https://pypi.org/simple/ \
+            claude-codex-bridge==${{ needs.build.outputs.version }}
+          python -c "import claude_codex_bridge; print(f'✅ Test PyPI installation verified: {claude_codex_bridge.__version__}')"
+
+  # Job 4: Publish to Production PyPI
+  publish-pypi:
+    if: |
+      github.event_name == 'release' && github.event.action == 'published' ||
+      github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'pypi'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/claude-codex-bridge/${{ needs.build.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Publish to PyPI (Trusted Publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          print-hash: true
+          attestations: true
+        continue-on-error: true
+        id: trusted-publish
+
+      - name: Publish to PyPI (Token Fallback)
+        if: steps.trusted-publish.outcome == 'failure'
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          uv publish --token $UV_PUBLISH_TOKEN
+
+      - name: Verify installation from PyPI
+        run: |
+          sleep 60  # Wait for package to be available
+          uv pip install claude-codex-bridge==${{ needs.build.outputs.version }}
+          python -c "import claude_codex_bridge; print(f'✅ PyPI installation verified: {claude_codex_bridge.__version__}')"
+
+      - name: Create GitHub Release Assets
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload ${{ github.event.release.tag_name }} dist/* --clobber
+
+  # Job 5: Post-publish notifications
+  notify:
+    if: always()
+    needs: [publish-testpypi, publish-pypi]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summary
+        run: |
+          echo "## 📊 Publishing Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.publish-testpypi.result }}" == "success" ]; then
+            echo "✅ **Test PyPI**: Published successfully" >> $GITHUB_STEP_SUMMARY
+            echo "   Package: https://test.pypi.org/project/claude-codex-bridge/" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.publish-testpypi.result }}" == "skipped" ]; then
+            echo "⏭️ **Test PyPI**: Skipped" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Test PyPI**: Failed or not run" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.publish-pypi.result }}" == "success" ]; then
+            echo "✅ **Production PyPI**: Published successfully" >> $GITHUB_STEP_SUMMARY
+            echo "   Package: https://pypi.org/project/claude-codex-bridge/" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.publish-pypi.result }}" == "skipped" ]; then
+            echo "⏭️ **Production PyPI**: Skipped" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Production PyPI**: Failed or not run" >> $GITHUB_STEP_SUMMARY
+          fi

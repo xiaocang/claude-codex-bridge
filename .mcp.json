@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "codex-bridge": {
-      "command": "uv",
-      "args": ["run", "-m", "claude_codex_bridge"],
-      "env": {}
-    }
-  }
-}
