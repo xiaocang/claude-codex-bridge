@@ -2,6 +2,10 @@
 
 An intelligent **MCP (Model Context Protocol) server** that leverages Codex's exceptional capabilities in **code analysis, architectural planning, and complex problem-solving**.
 
+## Screenshots
+
+![Claude-Codex Bridge](./screenshots/codex_bridge.png)
+
 ## Philosophy: Think First, Execute Later
 
 Claude-Codex Bridge embraces a **planning-first approach** to software development. Codex's true strength lies not in blindly executing changes, but in:
@@ -25,7 +29,7 @@ graph LR
     A[🔍 Analyze] --> B[🧠 Understand]
     B --> C[📋 Plan]
     C --> D[👁️ Review]
-    D --> E[⚡ Execute]
+    D --> E[⚡ Execute] (Claude Code)
     E --> F[✅ Validate]
 ```
 
@@ -33,33 +37,12 @@ graph LR
 2. **Understand**: Let Codex explain complex relationships and patterns
 3. **Plan**: Design comprehensive solutions and strategies
 4. **Review**: Examine Codex's recommendations carefully
-5. **Execute**: Enable write mode and apply changes thoughtfully
+5. **Execute**: Enable write mode and apply changes thoughtfully (Claude Code)
 6. **Validate**: Test and verify the implemented changes
 
 ## Project Overview
 
 Claude-Codex Bridge is an **Intelligent Analysis Engine** that orchestrates task delegation between Claude Code and locally running OpenAI Codex CLI. Rather than a simple code generator, it's a sophisticated planning and analysis system with intelligent caching, security validation, and read-only safety defaults.
-
-## Core Features
-
-### 🚀 Intelligent Task Delegation
-- **Automatic Task Routing**: Intelligently analyzes tasks and decides whether to delegate to Codex CLI
-- **Working Directory Management**: Secure working directory validation and file access control
-- **Execution Mode Control**: Supports multiple execution and sandbox modes for different security requirements
-
-### 🧠 Intelligent Processing
-- **Context Enhancement**: Intelligent context generation and file content management
-- **Error Handling**: Comprehensive error handling and fallback mechanisms
-
-### ⚡ Performance Optimization
-- **Intelligent Caching**: File content hash-based result caching system
-- **Concurrency Control**: Asynchronous execution and timeout management
-- **Resource Management**: LRU cache strategy and automatic cleanup mechanisms
-
-### 🛡️ Security Assurance
-- **Path Validation**: Strict working directory validation to prevent path traversal attacks
-- **Sandbox Isolation**: Supports multiple sandbox modes to restrict filesystem access
-- **Permission Control**: Fine-grained execution permission management
 
 ## Technical Architecture
 
@@ -210,44 +193,6 @@ cp .mcp.json.example .mcp.json
 /mcp__codex-execution__codex_delegate "Implement the security fixes we planned earlier" --working_directory "/path/to/your/project"
 ```
 
-## Practical Workflow Examples
-
-### Example 1: Security Analysis & Hardening
-```bash
-# Step 1: Analysis (Planning Mode)
-/mcp__codex-planning__codex_delegate "Analyze all API endpoints for security vulnerabilities"
-
-# Step 2: Planning (Planning Mode)
-/mcp__codex-planning__codex_delegate "Design comprehensive security fixes for the identified vulnerabilities"
-
-# Step 3: Implementation (Execution Mode)
-/mcp__codex-execution__codex_delegate "Implement the planned security improvements"
-```
-
-### Example 2: Performance Optimization
-```bash
-# Step 1: Profiling (Planning Mode)
-/mcp__codex-planning__codex_delegate "Analyze the application for performance bottlenecks"
-
-# Step 2: Strategy (Planning Mode)
-/mcp__codex-planning__codex_delegate "Design optimization strategies for the identified performance issues"
-
-# Step 3: Implementation (Execution Mode)
-/mcp__codex-execution__codex_delegate "Implement the highest-impact performance optimizations"
-```
-
-### Example 3: Architecture Refactoring
-```bash
-# Step 1: Assessment (Planning Mode)
-/mcp__codex-planning__codex_delegate "Evaluate the current architecture for scalability issues"
-
-# Step 2: Design (Planning Mode)
-/mcp__codex-planning__codex_delegate "Design a migration plan to improve the architecture"
-
-# Step 3: Execution (Execution Mode)
-/mcp__codex-execution__codex_delegate "Implement phase 1 of the architectural improvements"
-```
-
 ## Main Tools
 
 ### `codex_delegate`
@@ -320,130 +265,6 @@ MAX_CACHE_SIZE=100      # Maximum cache entries
 - **read-only**: Read-only access, suitable for code analysis and explanation
 - **workspace-write**: Writable workspace, suitable for most development tasks
 - **danger-full-access**: Full access, use with caution
-
-## Development and Testing
-
-### Running Tests
-
-```bash
-# Run all tests
-uv run python -m pytest tests/
-
-# Run specific tests
-uv run python -m pytest tests/test_engine.py
-uv run python -m pytest tests/test_cache.py
-```
-
-### Development Mode
-
-```bash
-# Debug with MCP Inspector
-uv run mcp dev src/claude_codex_bridge/bridge_server.py
-# Or if installed
-mcp dev claude-codex-bridge
-```
-
-### Code Quality
-
-```bash
-# Code formatting
-uv run black src/ tests/
-
-# Type checking
-uv run mypy src/
-
-# Code linting
-uv run flake8 src/ tests/
-```
-
-## Project Structure
-
-```
-claude-codex-bridge/
-├── src/
-│   └── claude_codex_bridge/
-│       ├── __init__.py       # Package initialization
-│       ├── __main__.py       # Entry point
-│       ├── bridge_server.py # Main MCP server
-│       ├── engine.py        # Delegation Decision Engine
-│       └── cache.py         # Result caching system
-├── tests/
-│   ├── test_engine.py     # Engine unit tests
-│   └── test_cache.py      # Cache unit tests
-├── .env                   # Environment configuration
-├── .mcp.json             # MCP client configuration example
-├── pyproject.toml        # Project configuration
-└── README.md            # Project documentation
-```
-
-## Best Practices
-
-### Embrace the Planning-First Approach
-
-#### 📋 Planning Phase (Read-Only Mode)
-
-**✅ Excellent analysis requests**:
-- "Analyze the user authentication system for security vulnerabilities and design patterns"
-- "Review the database layer for performance bottlenecks and optimization opportunities"
-- "Evaluate the API design for RESTful best practices and consistency"
-- "Assess the testing strategy and identify gaps in code coverage"
-
-**✅ Strategic planning requests**:
-- "Design a migration plan from the current monolithic architecture to microservices"
-- "Create a comprehensive refactoring strategy for legacy code modernization"
-- "Plan the implementation of a new payment processing feature with security considerations"
-
-#### ⚡ Execution Phase (Write Mode)
-
-**✅ Implementation-focused requests**:
-- "Implement the security improvements we planned for the authentication system"
-- "Apply the performance optimizations designed for the database queries"
-- "Execute phase 1 of the microservices migration plan"
-
-### Task Description Guidelines
-
-#### ❌ Avoid Vague Requests
-- "Improve the code" → Too broad, no specific focus
-- "Fix all issues" → Overwhelming scope
-- "Add new features" → Lacks specificity
-
-#### ✅ Write Specific, Actionable Descriptions
-- **Analysis**: "What patterns, issues, or opportunities should Codex identify?"
-- **Planning**: "What strategies, approaches, or solutions should Codex design?"
-- **Implementation**: "What specific changes should Codex apply?"
-
-### Security and Safety Recommendations
-
-1. **Start with Analysis**: Always begin in read-only mode to understand before acting
-2. **Use Absolute Paths**: Specify working directories with full paths
-3. **Plan Before Executing**: Review Codex's recommendations before enabling write mode
-4. **Validate Changes**: Test thoroughly after applying modifications
-5. **Monitor Resources**: Keep an eye on cache and system resource usage
-
-## Troubleshooting
-
-### Common Issues
-
-**Q: Codex CLI not found**
-```
-A: Make sure it's installed: npm install -g @openai/codex
-```
-
-**Q: Working directory validation failed**
-```
-A: Check that the directory path is absolute and exists
-```
-
-**Q: Cache miss**
-```
-A: File content changes invalidate cache, this is normal behavior
-```
-
-## Performance Optimization Tips
-
-1. **Enable caching**: Set appropriate TTL and cache size
-2. **Reasonable timeouts**: Set timeout based on task complexity
-3. **Regular cleanup**: Use `clear_cache` tool to clean unused cache
 
 ## Version History
 
