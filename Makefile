@@ -1,11 +1,12 @@
 # Makefile for claude-codex-bridge development
 
-.PHONY: help install format format-check lint test coverage security clean build all check
+.PHONY: help install format format-check lint test coverage security clean build all check autofix
 
 # Default target
 help:
 	@echo "Available targets:"
 	@echo "  install      - Install dependencies"
+	@echo "  autofix      - Auto-fix common issues (remove unused imports, sort imports, format)"
 	@echo "  format       - Format code with black"
 	@echo "  format-check - Check code formatting (CI style)"
 	@echo "  lint         - Run linting with flake8 and type checking with mypy"
@@ -20,6 +21,13 @@ help:
 # Install dependencies
 install:
 	uv sync --group dev
+
+# Auto-fix common issues
+autofix:
+	uv run autoflake --remove-all-unused-imports --in-place --recursive src/ tests/
+	uv run isort src/ tests/
+	uv run black src/ tests/
+	@echo "Auto-fix completed!"
 
 # Format code
 format:

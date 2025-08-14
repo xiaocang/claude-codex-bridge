@@ -4,13 +4,10 @@ Tests for read-only mode enforcement and --allow-write flag functionality.
 
 import json
 import os
-import sys
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
-# Must be before imports from src
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-from claude_codex_bridge.bridge_server import codex_delegate  # noqa: E402
+from claude_codex_bridge.bridge_server import codex_delegate
 
 
 class TestReadOnlyMode(unittest.TestCase):
@@ -161,7 +158,8 @@ class TestReadOnlyMode(unittest.TestCase):
         expected_notice = {
             "mode": "planning",
             "description": "Operating in planning and analysis mode (read-only)",
-            "message": "Codex will analyze your code and provide detailed recommendations without modifying files.",
+            "message": "Codex will analyze your code and provide detailed "
+            "recommendations without modifying files.",
             "hint": "To apply changes, restart the server with --allow-write flag",
             "benefits": [
                 "Safe exploration of solutions",

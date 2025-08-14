@@ -482,7 +482,8 @@ uv run -m claude_codex_bridge --allow-write
 ### Planning Mode (Default)
 ```python
 codex_delegate(
-    task_description="Analyze the user authentication system for security vulnerabilities",
+    task_description="Analyze the user authentication system for security
+                     vulnerabilities",
     working_directory="/path/to/your/project",
     execution_mode="on-failure",
     sandbox_mode="read-only",      # Enforced automatically
@@ -543,13 +544,15 @@ code blocks, or explanation text) and labels them in responses.
 
 ### Planning-First Approach
 1. **Start with Analysis**: Begin in read-only mode to understand before acting
-2. **Ask Strategic Questions**: Focus on "what patterns exist?" and "what could be improved?"
+2. **Ask Strategic Questions**: Focus on "what patterns exist?" and
+   "what could be improved?"
 3. **Plan Comprehensively**: Design solutions before implementing them
 4. **Review Before Executing**: Examine Codex's recommendations carefully
 
 ### Task Description Guidelines
 1. **Planning Phase**: "Analyze X for Y" or "Design strategy for Z"
-2. **Implementation Phase**: "Apply the planned improvements" or "Implement the designed solution"
+2. **Implementation Phase**: "Apply the planned improvements" or
+   "Implement the designed solution"
 3. **Be Specific**: State clear objectives and scope
 4. **Provide Context**: Include relevant constraints and requirements
 
@@ -714,7 +717,8 @@ a structured approach: Analyze → Plan → Execute.
 1. **Reference the Plan**: "Implement the security improvements we planned earlier"
 2. **Specific Scope**: "Apply the database optimizations to the user queries module"
 3. **Phased Approach**: "Execute phase 1 of the authentication refactoring plan"
-4. **Include Context**: "Apply the planned changes while maintaining backward compatibility"
+4. **Include Context**: "Apply the planned changes while maintaining
+   backward compatibility"
 
 ## Example Workflow: Security Hardening
 

@@ -5,16 +5,10 @@ passed after a `--` delimiter so leading dashes are treated as text.
 
 import asyncio
 import os
-import sys
-import types
 import unittest
 from unittest.mock import patch
 
-# Ensure src package is importable
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-from claude_codex_bridge.bridge_server import (
-    invoke_codex_cli,
-)  # type: ignore  # noqa: E402
+from claude_codex_bridge.bridge_server import invoke_codex_cli
 
 
 class DummyProcess:
@@ -91,7 +85,8 @@ class TestInvocationArgs(unittest.IsolatedAsyncioTestCase):
             )
 
             cmd = captured_args["cmd"]
-            # Verify that the literal prompt with leading dash is the final positional arg
+            # Verify that the literal prompt with leading dash is the final
+            # positional arg
             self.assertIn("--", cmd)
             self.assertEqual(cmd[-1], prompt)
 
