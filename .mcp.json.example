@@ -1,0 +1,34 @@
+{
+  "mcpServers": {
+    "codex-planning": {
+      "comment": "Default mode - for analysis, planning, and recommendations",
+      "command": "uv",
+      "args": ["run", "-m", "claude_codex_bridge"],
+      "env": {
+        "CACHE_TTL": "7200",
+        "MAX_CACHE_SIZE": "200"
+      }
+    },
+    "codex-execution": {
+      "comment": "Execution mode - when ready to apply Codex's recommendations",
+      "command": "uv",
+      "args": ["run", "-m", "claude_codex_bridge", "--allow-write"],
+      "env": {
+        "CACHE_TTL": "3600",
+        "MAX_CACHE_SIZE": "100"
+      }
+    },
+    "codex-bridge-pypi": {
+      "comment": "Using PyPI package - planning mode",
+      "command": "claude-codex-bridge",
+      "args": [],
+      "env": {}
+    },
+    "codex-bridge-pypi-write": {
+      "comment": "Using PyPI package - execution mode",
+      "command": "claude-codex-bridge",
+      "args": ["--allow-write"],
+      "env": {}
+    }
+  }
+}

@@ -1,6 +1,6 @@
 """Claude-Codex Bridge - An intelligent MCP server for task delegation."""
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 __author__ = "xiaocang"
 
 from .cache import ResultCache

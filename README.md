@@ -1,10 +1,44 @@
 # Claude-Codex Bridge
 
-An intelligent **MCP (Model Context Protocol) server** for orchestrating task delegation between Claude and OpenAI Codex CLI.
+An intelligent **MCP (Model Context Protocol) server** that leverages Codex's exceptional capabilities in **code analysis, architectural planning, and complex problem-solving**.
+
+## Philosophy: Think First, Execute Later
+
+Claude-Codex Bridge embraces a **planning-first approach** to software development. Codex's true strength lies not in blindly executing changes, but in:
+
+- 🧠 **Deep Understanding**: Comprehending complex code relationships and patterns
+- 📊 **Strategic Analysis**: Identifying optimization opportunities and architectural insights
+- 🎯 **Thoughtful Planning**: Designing robust, well-considered solutions
+- ✅ **Quality Assurance**: Reviewing code for best practices, security, and performance
+
+### Why Read-Only by Default?
+
+1. **Safety First**: Prevent accidental modifications during code exploration
+2. **Better Decisions**: Encourage thorough analysis before making changes
+3. **Learning Tool**: Understand the "why" behind recommendations, not just the "what"
+4. **Audit Trail**: Clear separation between planning and execution phases
+
+### Recommended Development Flow
+
+```mermaid
+graph LR
+    A[🔍 Analyze] --> B[🧠 Understand]
+    B --> C[📋 Plan]
+    C --> D[👁️ Review]
+    D --> E[⚡ Execute]
+    E --> F[✅ Validate]
+```
+
+1. **Analyze**: Use read-only mode to deeply understand your codebase
+2. **Understand**: Let Codex explain complex relationships and patterns
+3. **Plan**: Design comprehensive solutions and strategies
+4. **Review**: Examine Codex's recommendations carefully
+5. **Execute**: Enable write mode and apply changes thoughtfully
+6. **Validate**: Test and verify the implemented changes
 
 ## Project Overview
 
-Claude-Codex Bridge is an **Agentic Bridge** that intelligently delegates coding tasks from Claude Code to locally running OpenAI Codex CLI. Rather than a simple request forwarder, it's an intelligent orchestration system with decision-making capabilities, featuring result caching and security validation.
+Claude-Codex Bridge is an **Intelligent Analysis Engine** that orchestrates task delegation between Claude Code and locally running OpenAI Codex CLI. Rather than a simple code generator, it's a sophisticated planning and analysis system with intelligent caching, security validation, and read-only safety defaults.
 
 ## Core Features
 
@@ -73,7 +107,7 @@ pip install claude-codex-bridge
 
 2. **Clone the project**
    ```bash
-   git clone https://github.com/xiaocang/claude-codex-bridge.git 
+   git clone https://github.com/xiaocang/claude-codex-bridge.git
    cd claude-codex-bridge
    ```
 
@@ -98,7 +132,10 @@ pip install claude-codex-bridge
 
 ### Starting the Server
 
-After installation, you can start the server using one of these methods:
+The server supports two operational modes:
+
+#### 📋 Planning Mode (Default - Recommended)
+Start in read-only mode for safe code analysis and planning:
 
 **If installed from PyPI:**
 ```bash
@@ -113,48 +150,139 @@ python -m claude_codex_bridge
 **If running from source:**
 ```bash
 uv run python -m claude_codex_bridge
-# Or directly:
-uv run src/claude_codex_bridge/bridge_server.py
 ```
+
+#### ⚡ Execution Mode (When Ready to Apply Changes)
+Enable write operations when you're ready to implement Codex's recommendations:
+
+**If installed from PyPI:**
+```bash
+claude-codex-bridge --allow-write
+```
+
+**Or using Python module:**
+```bash
+python -m claude_codex_bridge --allow-write
+```
+
+**If running from source:**
+```bash
+uv run python -m claude_codex_bridge --allow-write
+```
+
+#### Command-Line Options
+- `--allow-write`: Enable file modification operations (default: read-only)
+- `--verbose`: Enable verbose output for debugging
 
 ### Claude Code Integration
 
-1. **Configure MCP Server**
-   
-   If installed from PyPI:
-   ```bash
-   # In your project directory
-   claude mcp add codex-bridge --command "claude-codex-bridge" --scope project
-   ```
-   
-   Or if running from source:
-   ```bash
-   # In your project directory
-   claude mcp add codex-bridge --command "python -m claude_codex_bridge" --scope project
-   ```
+#### 1. Configure MCP Server
+You can configure separate servers for planning and execution modes:
 
-2. **Use Tools**
-   ```
-   /mcp__codex-bridge__codex_delegate "Refactor main.py file to use async/await syntax" --working_directory "/path/to/your/project"
-   ```
+**Planning Mode (Default):**
+```bash
+# In your project directory - for safe analysis and planning
+claude mcp add codex-planning --command "claude-codex-bridge" --scope project
+```
+
+**Execution Mode:**
+```bash
+# In your project directory - for applying changes
+claude mcp add codex-execution --command "claude-codex-bridge --allow-write" --scope project
+```
+
+**Or use the example configuration file:**
+```bash
+# Copy the example configuration
+cp .mcp.json.example .mcp.json
+# Edit to match your setup
+```
+
+#### 2. Usage Examples
+
+**Planning Phase (Read-Only):**
+```
+/mcp__codex-planning__codex_delegate "Analyze the authentication system for security vulnerabilities" --working_directory "/path/to/your/project"
+```
+
+**Execution Phase (Write-Enabled):**
+```
+/mcp__codex-execution__codex_delegate "Implement the security fixes we planned earlier" --working_directory "/path/to/your/project"
+```
+
+## Practical Workflow Examples
+
+### Example 1: Security Analysis & Hardening
+```bash
+# Step 1: Analysis (Planning Mode)
+/mcp__codex-planning__codex_delegate "Analyze all API endpoints for security vulnerabilities"
+
+# Step 2: Planning (Planning Mode)
+/mcp__codex-planning__codex_delegate "Design comprehensive security fixes for the identified vulnerabilities"
+
+# Step 3: Implementation (Execution Mode)
+/mcp__codex-execution__codex_delegate "Implement the planned security improvements"
+```
+
+### Example 2: Performance Optimization
+```bash
+# Step 1: Profiling (Planning Mode)
+/mcp__codex-planning__codex_delegate "Analyze the application for performance bottlenecks"
+
+# Step 2: Strategy (Planning Mode)
+/mcp__codex-planning__codex_delegate "Design optimization strategies for the identified performance issues"
+
+# Step 3: Implementation (Execution Mode)
+/mcp__codex-execution__codex_delegate "Implement the highest-impact performance optimizations"
+```
+
+### Example 3: Architecture Refactoring
+```bash
+# Step 1: Assessment (Planning Mode)
+/mcp__codex-planning__codex_delegate "Evaluate the current architecture for scalability issues"
+
+# Step 2: Design (Planning Mode)
+/mcp__codex-planning__codex_delegate "Design a migration plan to improve the architecture"
+
+# Step 3: Execution (Execution Mode)
+/mcp__codex-execution__codex_delegate "Implement phase 1 of the architectural improvements"
+```
 
 ## Main Tools
 
 ### `codex_delegate`
 
-Core task delegation tool that delegates coding tasks to Codex CLI.
+Leverage Codex's advanced analytical capabilities for code comprehension and strategic planning.
+
+**Codex Specializes In**:
+- 🔍 Analyzing complex codebases and identifying improvement opportunities
+- 🏗️ Designing architectural solutions and refactoring strategies
+- 📋 Planning implementation approaches for new features
+- 🧪 Generating comprehensive test strategies
+- ⚡ Reviewing code for quality, security, and performance issues
 
 **Parameters**:
-- `task_description` (required): Natural language description of the task
-- `working_directory` (required): Absolute path to the project working directory
-- `execution_mode` (optional): Execution mode (untrusted/on-failure/on-request/never)
-- `sandbox_mode` (optional): Sandbox mode (read-only/workspace-write/danger-full-access)
-- `output_format` (optional): Output format (diff/full_file/explanation)
+- `task_description` (required): Describe what you want Codex to analyze or plan
+- `working_directory` (required): Project directory to analyze
+- `execution_mode` (optional): Approval strategy (default: on-failure)
+- `sandbox_mode` (optional): File access mode (forced to read-only unless --allow-write)
+- `output_format` (optional): How to format the analysis results (diff/full_file/explanation)
 
-**Example**:
+**Planning Mode Example**:
 ```json
 {
-  "task_description": "Add email validation method to User class",
+  "task_description": "Analyze the user authentication system for security vulnerabilities and design improvement strategies",
+  "working_directory": "/Users/username/my-project",
+  "execution_mode": "on-failure",
+  "sandbox_mode": "read-only",
+  "output_format": "explanation"
+}
+```
+
+**Execution Mode Example**:
+```json
+{
+  "task_description": "Implement the security improvements we planned for the authentication system",
   "working_directory": "/Users/username/my-project",
   "execution_mode": "on-failure",
   "sandbox_mode": "workspace-write",
@@ -250,24 +378,47 @@ claude-codex-bridge/
 
 ## Best Practices
 
-### Writing Task Descriptions
+### Embrace the Planning-First Approach
 
-✅ **Good task descriptions**:
-- "Add a validate_email method to the User class to validate email format"
-- "Refactor all authentication-related functions in src/auth.py file to use async/await"
-- "Add boundary condition and exception handling tests for the calculate_tax function"
+#### 📋 Planning Phase (Read-Only Mode)
 
-❌ **Avoid these descriptions**:
-- "Improve the code"
-- "Fix all issues"
-- "Add new features"
+**✅ Excellent analysis requests**:
+- "Analyze the user authentication system for security vulnerabilities and design patterns"
+- "Review the database layer for performance bottlenecks and optimization opportunities"
+- "Evaluate the API design for RESTful best practices and consistency"
+- "Assess the testing strategy and identify gaps in code coverage"
 
-### Security Recommendations
+**✅ Strategic planning requests**:
+- "Design a migration plan from the current monolithic architecture to microservices"
+- "Create a comprehensive refactoring strategy for legacy code modernization"
+- "Plan the implementation of a new payment processing feature with security considerations"
 
-1. Use absolute paths to specify working directory
-2. Use `read-only` sandbox mode for production environments
-3. Regularly clean cache and log files
-4. Monitor system resource usage
+#### ⚡ Execution Phase (Write Mode)
+
+**✅ Implementation-focused requests**:
+- "Implement the security improvements we planned for the authentication system"
+- "Apply the performance optimizations designed for the database queries"
+- "Execute phase 1 of the microservices migration plan"
+
+### Task Description Guidelines
+
+#### ❌ Avoid Vague Requests
+- "Improve the code" → Too broad, no specific focus
+- "Fix all issues" → Overwhelming scope
+- "Add new features" → Lacks specificity
+
+#### ✅ Write Specific, Actionable Descriptions
+- **Analysis**: "What patterns, issues, or opportunities should Codex identify?"
+- **Planning**: "What strategies, approaches, or solutions should Codex design?"
+- **Implementation**: "What specific changes should Codex apply?"
+
+### Security and Safety Recommendations
+
+1. **Start with Analysis**: Always begin in read-only mode to understand before acting
+2. **Use Absolute Paths**: Specify working directories with full paths
+3. **Plan Before Executing**: Review Codex's recommendations before enabling write mode
+4. **Validate Changes**: Test thoroughly after applying modifications
+5. **Monitor Resources**: Keep an eye on cache and system resource usage
 
 ## Troubleshooting
 
@@ -295,6 +446,9 @@ A: File content changes invalidate cache, this is normal behavior
 3. **Regular cleanup**: Use `clear_cache` tool to clean unused cache
 
 ## Version History
+
+### v0.1.1
+- 🔄 Version update and maintenance release
 
 ### v0.1.0
 - ✅ Basic MCP server implementation

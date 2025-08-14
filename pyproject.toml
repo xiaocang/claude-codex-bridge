@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "claude_codex_bridge"
-version = "0.1.0"
+version = "0.1.1"
 description = "An intelligent MCP server for orchestrating task delegation between Claude and OpenAI Codex CLI"
 readme = "README.md"
 requires-python = ">=3.11"
