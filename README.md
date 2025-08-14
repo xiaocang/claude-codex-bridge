@@ -4,7 +4,7 @@ An intelligent **MCP (Model Context Protocol) server** that leverages Codex's ex
 
 ## Screenshots
 
-![Claude-Codex Bridge](./screenshots/codex_bridge.png)
+![Claude-Codex Bridge](./screenshot/codex_bridge.png)
 
 ## Philosophy: Think First, Execute Later
 
