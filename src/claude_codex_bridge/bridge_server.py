@@ -8,7 +8,7 @@ between Claude and OpenAI Codex CLI.
 import asyncio
 import json
 import os
-from typing import Literal, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 from mcp.server.fastmcp import FastMCP
 
@@ -196,7 +196,8 @@ async def codex_delegate(
     output_format: Literal["diff", "full_file", "explanation"] = "diff",
 ) -> str:
     """
-    Leverage Codex's advanced analytical capabilities for code comprehension and planning.
+    Leverage Codex's advanced analytical capabilities for code comprehension and
+    planning.
 
     Codex specializes in:
     • Analyzing complex codebases and identifying improvement opportunities
@@ -220,7 +221,7 @@ async def codex_delegate(
     """
     # 1. Validate working directory
     if not dde.validate_working_directory(working_directory):
-        error_result = {
+        error_result: Dict[str, Any] = {
             "status": "error",
             "message": f"Invalid or unsafe working directory: {working_directory}",
             "error_type": "invalid_directory",
@@ -229,7 +230,7 @@ async def codex_delegate(
 
     # 2. Enforce read-only mode if write is not allowed
     effective_sandbox_mode = sandbox_mode
-    mode_notice = None
+    mode_notice: Optional[Dict[str, Union[str, List[str]]]] = None
 
     # Check if write operations are allowed (default: False for safety)
     allow_write = os.environ.get("CODEX_ALLOW_WRITE", "false").lower() == "true"
@@ -239,7 +240,10 @@ async def codex_delegate(
         mode_notice = {
             "mode": "planning",
             "description": "Operating in planning and analysis mode (read-only)",
-            "message": "Codex will analyze your code and provide detailed recommendations without modifying files.",
+            "message": (
+                "Codex will analyze your code and provide detailed "
+                "recommendations without modifying files."
+            ),
             "hint": "To apply changes, restart the server with --allow-write flag",
             "benefits": [
                 "Safe exploration of solutions",

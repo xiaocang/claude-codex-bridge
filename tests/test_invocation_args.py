@@ -3,16 +3,18 @@ Tests for correct Codex CLI argument construction, ensuring prompts are
 passed after a `--` delimiter so leading dashes are treated as text.
 """
 
+import asyncio
 import os
 import sys
-import asyncio
 import types
 import unittest
 from unittest.mock import patch
 
 # Ensure src package is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-from claude_codex_bridge.bridge_server import invoke_codex_cli  # type: ignore  # noqa: E402
+from claude_codex_bridge.bridge_server import (
+    invoke_codex_cli,
+)  # type: ignore  # noqa: E402
 
 
 class DummyProcess:
@@ -43,7 +45,9 @@ class TestInvocationArgs(unittest.IsolatedAsyncioTestCase):
             captured_args["cwd"] = kwargs.get("cwd")
             return DummyProcess(returncode=0, stdout=b"done", stderr=b"")
 
-        with patch.object(asyncio, "create_subprocess_exec", side_effect=fake_subprocess_exec):
+        with patch.object(
+            asyncio, "create_subprocess_exec", side_effect=fake_subprocess_exec
+        ):
             # Force read-only behavior to avoid write flags complicating the check
             os.environ["CODEX_ALLOW_WRITE"] = "false"
 
@@ -72,7 +76,9 @@ class TestInvocationArgs(unittest.IsolatedAsyncioTestCase):
             captured_args["cmd"] = list(cmd)
             return DummyProcess(returncode=0, stdout=b"ok", stderr=b"")
 
-        with patch.object(asyncio, "create_subprocess_exec", side_effect=fake_subprocess_exec):
+        with patch.object(
+            asyncio, "create_subprocess_exec", side_effect=fake_subprocess_exec
+        ):
             os.environ["CODEX_ALLOW_WRITE"] = "false"
 
             prompt = "-a do something"
@@ -92,4 +98,3 @@ class TestInvocationArgs(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
