@@ -29,7 +29,7 @@ graph LR
     A[🔍 Analyze] --> B[🧠 Understand]
     B --> C[📋 Plan]
     C --> D[👁️ Review]
-    D --> E[⚡ Execute] (Claude Code)
+    D --> E[⚡ Execute With Claude Code]
     E --> F[✅ Validate]
 ```
 
