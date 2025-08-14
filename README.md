@@ -37,7 +37,7 @@ graph LR
 2. **Understand**: Let Codex explain complex relationships and patterns
 3. **Plan**: Design comprehensive solutions and strategies
 4. **Review**: Examine Codex's recommendations carefully
-5. **Execute**: Enable write mode and apply changes thoughtfully (Claude Code)
+5. **Execute**: Enable write mode and apply changes thoughtfully using Claude Code
 6. **Validate**: Test and verify the implemented changes
 
 ## Project Overview
