@@ -391,7 +391,7 @@ async def cache_stats() -> str:
 @mcp.tool()
 async def clear_cache() -> str:
     """
-    Clears all caches.
+    Clears the result cache.
 
     Returns:
         A JSON string of the operation result.
