@@ -7,6 +7,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 # Must be before imports from src
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -85,21 +86,23 @@ class TestResultCache(unittest.TestCase):
         # 创建短期缓存
         short_cache = ResultCache(ttl=1, max_size=10)
 
-        # 设置缓存
-        short_cache.set(
-            "task1", self.temp_dir, "mode1", "sandbox1", "format1", "result1"
-        )
+        # 模拟时间流逝，避免实际等待
+        with patch("time.time", side_effect=[1000, 1000, 1000, 1002]):
+            short_cache.set(
+                "task1", self.temp_dir, "mode1", "sandbox1", "format1", "result1"
+            )
 
-        # 立即获取应该成功
-        result = short_cache.get("task1", self.temp_dir, "mode1", "sandbox1", "format1")
-        self.assertEqual(result, "result1")
+            # 立即获取应该成功
+            result = short_cache.get(
+                "task1", self.temp_dir, "mode1", "sandbox1", "format1"
+            )
+            self.assertEqual(result, "result1")
 
-        # 等待过期
-        time.sleep(1.1)
-
-        # 再次获取应该返回 None
-        result = short_cache.get("task1", self.temp_dir, "mode1", "sandbox1", "format1")
-        self.assertIsNone(result)
+            # 时间前进，触发过期
+            result = short_cache.get(
+                "task1", self.temp_dir, "mode1", "sandbox1", "format1"
+            )
+            self.assertIsNone(result)
 
     def test_cache_size_limit(self):
         """测试缓存大小限制"""
