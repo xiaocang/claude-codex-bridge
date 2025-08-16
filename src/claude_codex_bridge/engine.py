@@ -74,10 +74,11 @@ class DelegationDecisionEngine:
 
         # Basic security check - prevent access to sensitive system directories
         dangerous_paths = ["/etc", "/usr/bin", "/bin", "/sbin", "/root"]
-        normalized_path = os.path.normpath(directory)
+        normalized_path = os.path.realpath(directory)
 
         for dangerous in dangerous_paths:
-            if normalized_path.startswith(dangerous):
+            dangerous_real = os.path.realpath(dangerous)
+            if os.path.commonpath([normalized_path, dangerous_real]) == dangerous_real:
                 return False
 
         return True

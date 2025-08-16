@@ -57,6 +57,12 @@ class TestDelegationDecisionEngine(unittest.TestCase):
             result = self.dde.validate_working_directory(path)
             self.assertFalse(result, f"危险路径 {path} 应该被拒绝")
 
+    def test_validate_working_directory_similar_prefix_allowed(self):
+        """路径名称与敏感目录同前缀但并非其子目录时允许访问"""
+        with tempfile.TemporaryDirectory(prefix="etc_tmp_", dir="/") as temp_dir:
+            result = self.dde.validate_working_directory(temp_dir)
+            self.assertTrue(result)
+
 
 if __name__ == "__main__":
     unittest.main()
