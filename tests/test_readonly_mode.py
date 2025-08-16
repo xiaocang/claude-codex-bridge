@@ -10,16 +10,16 @@ from unittest.mock import patch
 from claude_codex_bridge.bridge_server import codex_delegate
 
 
-class TestReadOnlyMode(unittest.TestCase):
+class TestReadOnlyMode(unittest.IsolatedAsyncioTestCase):
     """Test read-only mode enforcement and write permission handling."""
 
-    def setUp(self):
+    async def asyncSetUp(self):
         """Setup before tests."""
         # Reset environment for clean test state
         if "CODEX_ALLOW_WRITE" in os.environ:
             del os.environ["CODEX_ALLOW_WRITE"]
 
-    def tearDown(self):
+    async def asyncTearDown(self):
         """Cleanup after tests."""
         # Reset environment
         if "CODEX_ALLOW_WRITE" in os.environ:
