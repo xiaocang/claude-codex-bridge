@@ -170,4 +170,4 @@ The project uses pytest with comprehensive unit tests covering:
 
 **Path Security**: Always use absolute paths, validate directory existence and permissions
 
-- write code, comments, and string const, with English, always
+- write code, comments, and string constants, with English, always
