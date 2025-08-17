@@ -219,16 +219,7 @@ async def codex_delegate(
     Returns:
         Detailed analysis, recommendations, or implementation plan
     """
-    # 1. Validate working directory
-    if not dde.validate_working_directory(working_directory):
-        error_result: Dict[str, Any] = {
-            "status": "error",
-            "message": f"Invalid or unsafe working directory: {working_directory}",
-            "error_type": "invalid_directory",
-        }
-        return json.dumps(error_result, indent=2, ensure_ascii=False)
-
-    # 2. Enforce read-only mode if write is not allowed
+    # 1. Enforce read-only mode if write is not allowed (do this first)
     effective_sandbox_mode = sandbox_mode
     mode_notice: Optional[Dict[str, Union[str, List[str]]]] = None
 
@@ -251,6 +242,23 @@ async def codex_delegate(
                 "Thoughtful planning before execution",
             ],
         }
+
+    # 2. Validate working directory
+    if not dde.validate_working_directory(working_directory):
+        error_result: Dict[str, Any] = {
+            "status": "error",
+            "message": f"Invalid or unsafe working directory: {working_directory}",
+            "error_type": "invalid_directory",
+            "working_directory": working_directory,
+            "sandbox_mode": effective_sandbox_mode,
+            "requested_sandbox_mode": sandbox_mode,
+        }
+        
+        # Add operation mode notice if applicable
+        if mode_notice:
+            error_result["operation_mode"] = mode_notice
+            
+        return json.dumps(error_result, indent=2, ensure_ascii=False)
 
     # 3. Check cache
     cached_result = result_cache.get(
