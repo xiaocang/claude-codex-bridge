@@ -87,18 +87,21 @@ class TestResultCache(unittest.TestCase):
         short_cache = ResultCache(ttl=1, max_size=10)
 
         # 模拟时间流逝，避免实际等待
-        with patch("time.time", side_effect=[1000, 1000, 1000, 1002]):
+        with patch("time.time") as mock_time:
+            mock_time.return_value = 1000
             short_cache.set(
                 "task1", self.temp_dir, "mode1", "sandbox1", "format1", "result1"
             )
 
             # 立即获取应该成功
+            mock_time.return_value = 1000
             result = short_cache.get(
                 "task1", self.temp_dir, "mode1", "sandbox1", "format1"
             )
             self.assertEqual(result, "result1")
 
             # 时间前进，触发过期
+            mock_time.return_value = 1002
             result = short_cache.get(
                 "task1", self.temp_dir, "mode1", "sandbox1", "format1"
             )
