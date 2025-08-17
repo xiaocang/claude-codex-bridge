@@ -78,7 +78,6 @@ class DelegationDecisionEngine:
 
         for dangerous in dangerous_paths:
             dangerous_real = os.path.realpath(dangerous)
-            if os.path.commonpath([normalized_path, dangerous_real]) == dangerous_real:
             try:
                 if os.path.commonpath([normalized_path, dangerous_real]) == dangerous_real:
                     return False
