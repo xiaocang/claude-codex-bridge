@@ -79,6 +79,11 @@ class DelegationDecisionEngine:
         for dangerous in dangerous_paths:
             dangerous_real = os.path.realpath(dangerous)
             if os.path.commonpath([normalized_path, dangerous_real]) == dangerous_real:
-                return False
+            try:
+                if os.path.commonpath([normalized_path, dangerous_real]) == dangerous_real:
+                    return False
+            except ValueError:
+                # Paths are on different drives or otherwise incomparable; skip
+                continue
 
         return True
