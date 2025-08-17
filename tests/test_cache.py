@@ -94,7 +94,6 @@ class TestResultCache(unittest.TestCase):
             )
 
             # 立即获取应该成功
-            mock_time.return_value = 1000
             result = short_cache.get(
                 "task1", self.temp_dir, "mode1", "sandbox1", "format1"
             )
