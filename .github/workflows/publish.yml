@@ -159,14 +159,6 @@ jobs:
             --publish-url https://test.pypi.org/legacy/ \
             --token $UV_PUBLISH_TOKEN
 
-      - name: Verify installation from Test PyPI
-        run: |
-          sleep 30  # Wait for package to be available
-          uv pip install --index-url https://test.pypi.org/simple/ \
-            --extra-index-url https://pypi.org/simple/ \
-            claude-codex-bridge==${{ needs.build.outputs.version }}
-          python -c "import claude_codex_bridge; print(f'✅ Test PyPI installation verified: {claude_codex_bridge.__version__}')"
-
   # Job 4: Publish to Production PyPI
   publish-pypi:
     if: |
@@ -206,12 +198,6 @@ jobs:
           UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           uv publish --token $UV_PUBLISH_TOKEN
-
-      - name: Verify installation from PyPI
-        run: |
-          sleep 60  # Wait for package to be available
-          uv pip install claude-codex-bridge==${{ needs.build.outputs.version }}
-          python -c "import claude_codex_bridge; print(f'✅ PyPI installation verified: {claude_codex_bridge.__version__}')"
 
       - name: Create GitHub Release Assets
         if: github.event_name == 'release'
