@@ -18,7 +18,7 @@ on:
           - pypi
 
 permissions:
-  contents: read
+  contents: write  # For uploading release assets
   id-token: write  # For trusted publishing
   attestations: write  # For supply chain security
 
