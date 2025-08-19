@@ -253,11 +253,11 @@ async def codex_delegate(
             "sandbox_mode": effective_sandbox_mode,
             "requested_sandbox_mode": sandbox_mode,
         }
-        
+
         # Add operation mode notice if applicable
         if mode_notice:
             error_result["operation_mode"] = mode_notice
-            
+
         return json.dumps(error_result, indent=2, ensure_ascii=False)
 
     # 3. Check cache
