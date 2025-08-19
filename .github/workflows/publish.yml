@@ -96,23 +96,31 @@ jobs:
       - name: Generate checksums
         id: hash
         run: |
+          mkdir -p checksums
           cd dist
-          sha256sum *.tar.gz > checksums.txt
-          sha256sum *.whl >> checksums.txt
+          sha256sum *.tar.gz > ../checksums/checksums.txt
+          sha256sum *.whl >> ../checksums/checksums.txt
           echo "hash-sdist=$(sha256sum *.tar.gz | cut -d' ' -f1)" >> $GITHUB_OUTPUT
           echo "hash-wheel=$(sha256sum *.whl | cut -d' ' -f1)" >> $GITHUB_OUTPUT
-          cat checksums.txt
+          cat ../checksums/checksums.txt
 
       - name: Verify distributions
         run: |
           uv pip install --no-deps dist/*.whl
           uv run python -c "import claude_codex_bridge; print(f'✅ Import successful: {claude_codex_bridge.__version__}')"
 
-      - name: Upload artifacts
+      - name: Upload distribution artifacts
         uses: actions/upload-artifact@v4
         with:
           name: python-distributions
           path: dist/
+          retention-days: 7
+
+      - name: Upload checksum artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: checksums
+          path: checksums/
           retention-days: 7
 
   # Job 3: Publish to Test PyPI
@@ -129,7 +137,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download artifacts
+      - name: Download distribution artifacts
         uses: actions/download-artifact@v4
         with:
           name: python-distributions
@@ -140,24 +148,13 @@ jobs:
         with:
           version: "latest"
 
-      - name: Publish to Test PyPI (Trusted Publishing)
+      - name: Publish to Test PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
           skip-existing: true
           print-hash: true
           attestations: true
-        continue-on-error: true
-        id: trusted-publish
-
-      - name: Publish to Test PyPI (Token Fallback)
-        if: steps.trusted-publish.outcome == 'failure'
-        env:
-          UV_PUBLISH_TOKEN: ${{ secrets.TEST_PYPI_API_TOKEN }}
-        run: |
-          uv publish \
-            --publish-url https://test.pypi.org/legacy/ \
-            --token $UV_PUBLISH_TOKEN
 
   # Job 4: Publish to Production PyPI
   publish-pypi:
@@ -173,38 +170,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download artifacts
+      - name: Download distribution artifacts
         uses: actions/download-artifact@v4
         with:
           name: python-distributions
           path: dist/
+
+      - name: Download checksum artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: checksums
+          path: checksums/
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
         with:
           version: "latest"
 
-      - name: Publish to PyPI (Trusted Publishing)
+      - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           print-hash: true
           attestations: true
-        continue-on-error: true
-        id: trusted-publish
-
-      - name: Publish to PyPI (Token Fallback)
-        if: steps.trusted-publish.outcome == 'failure'
-        env:
-          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
-          uv publish --token $UV_PUBLISH_TOKEN
 
       - name: Create GitHub Release Assets
         if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload ${{ github.event.release.tag_name }} dist/* --clobber
+          gh release upload ${{ github.event.release.tag_name }} dist/* checksums/* --clobber
 
   # Job 5: Post-publish notifications
   notify:
