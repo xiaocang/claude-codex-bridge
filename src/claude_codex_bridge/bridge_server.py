@@ -59,7 +59,7 @@ async def invoke_codex_cli(
     sandbox_mode: str,
     task_complexity: Literal["low", "medium", "high"] = "medium",
     allow_write: bool = True,
-    timeout: int = 300,  # 5 minute timeout
+    timeout: int = 3600,  # 1 hour timeout
 ) -> Tuple[str, str]:
     """
     Asynchronously invoke Codex CLI and return its stdout and stderr.

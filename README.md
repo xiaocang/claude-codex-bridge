@@ -213,6 +213,7 @@ Leverage Codex's advanced analytical capabilities for code comprehension and str
 - `sandbox_mode` (optional): File access mode (forced to read-only unless --allow-write)
 - `output_format` (optional): How to format the analysis results (diff/full_file/explanation)
 - `task_complexity` (optional): Model reasoning effort (low/medium/high)
+- Codex CLI invocations time out after **1 hour** by default to support long-running analyses
 
 **Planning Mode Example**:
 ```json
