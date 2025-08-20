@@ -83,7 +83,7 @@ class DelegationDecisionEngine:
 
         return True
 
-    def assess_task_complexity(
+    def _assess_task_complexity(
         self, task_description: str
     ) -> Literal["low", "medium", "high"]:
         """Assess task complexity based on a simple heuristic.
