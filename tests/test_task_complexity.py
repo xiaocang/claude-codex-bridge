@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -40,14 +41,15 @@ class TestTaskComplexity(unittest.IsolatedAsyncioTestCase):
         ):
             os.environ["CODEX_ALLOW_WRITE"] = "false"
 
-            await codex_delegate(
-                task_description="Analyze code",
-                working_directory="/tmp",
-                execution_mode="on-failure",
-                sandbox_mode="read-only",
-                output_format="diff",
-                task_complexity="high",
-            )
+            with tempfile.TemporaryDirectory() as tmpdir:
+                await codex_delegate(
+                    task_description="Analyze code",
+                    working_directory=tmpdir,
+                    execution_mode="on-failure",
+                    sandbox_mode="read-only",
+                    output_format="diff",
+                    task_complexity="high",
+                )
 
         cmd = captured_args["cmd"]
         pair_found = any(
