@@ -214,6 +214,8 @@ async def codex_delegate(
         working_directory: Project directory to analyze
         execution_mode: Approval strategy (default: on-failure)
         sandbox_mode: File access mode (forced to read-only unless --allow-write)
+        task_complexity: Task complexity level ("low", "medium", "high") forwarded
+            to Codex as -c model_reasoning_effort="<level>"
         output_format: How to format the analysis results
 
     Returns:
@@ -531,6 +533,20 @@ codex_delegate(
 - `read-only`: Read-only access (automatically enforced unless --allow-write)
 - `workspace-write`: Writable workspace (only available with --allow-write)
 - `danger-full-access`: Full system access (dangerous, requires --allow-write)
+
+**task_complexity** (optional, default: "medium")
+- `low`: Minimal reasoning effort
+- `medium`: Balanced reasoning depth
+- `high`: Maximum reasoning depth
+- Sets Codex flag `-c model_reasoning_effort="<level>"`
+
+```python
+codex_delegate(
+    task_description="Map critical paths in the request pipeline",
+    working_directory="/path/to/your/project",
+    task_complexity="high",  # -> -c model_reasoning_effort="high"
+)
+```
 
 **output_format** (optional, default: "diff")
 - `explanation`: Natural language analysis and recommendations (best for planning)
