@@ -5,6 +5,7 @@ Responsible for analyzing tasks and deciding whether and how to delegate to Code
 """
 
 import os
+from typing import Literal
 
 
 class DelegationDecisionEngine:
@@ -81,3 +82,47 @@ class DelegationDecisionEngine:
                 return False
 
         return True
+
+    def assess_task_complexity(
+        self, task_description: str
+    ) -> Literal["low", "medium", "high"]:
+        """Assess task complexity based on a simple heuristic.
+
+        The current implementation uses the number of words in the task
+        description as a proxy for complexity:
+
+        - ``<=10`` words -> ``low``
+        - ``11-20`` words -> ``medium``
+        - ``>20`` words -> ``high``
+
+        Args:
+            task_description: The task description to analyze
+
+        Returns:
+            A complexity level: ``low``, ``medium`` or ``high``
+        """
+
+        word_count = len(task_description.split())
+        if word_count <= 10:
+            return "low"
+        if word_count <= 20:
+            return "medium"
+        return "high"
+
+    def determine_thinking_model(
+        self, task_description: str
+    ) -> Literal["low", "medium", "high"]:
+        """Determine the Codex thinking model for a task.
+
+        Currently this is a thin wrapper around :meth:`assess_task_complexity`
+        but allows future customisation of how thinking models are selected.
+
+        Args:
+            task_description: Description of the task being delegated.
+
+        Returns:
+            One of ``low``, ``medium`` or ``high`` representing the thinking
+            depth Codex should apply.
+        """
+
+        return self.assess_task_complexity(task_description)

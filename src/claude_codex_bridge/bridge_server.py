@@ -55,6 +55,7 @@ async def invoke_codex_cli(
     sandbox_mode: str,
     allow_write: bool = True,
     timeout: int = 300,  # 5 minute timeout
+    thinking_model: Optional[str] = None,
 ) -> Tuple[str, str]:
     """
     Asynchronously invoke Codex CLI and return its stdout and stderr.
@@ -66,6 +67,7 @@ async def invoke_codex_cli(
         sandbox_mode: Codex CLI sandbox strategy mode
         allow_write: Whether to allow file write operations
         timeout: Command timeout in seconds
+        thinking_model: Optional thinking depth hint for Codex CLI
 
     Returns:
         Tuple containing (stdout, stderr)
@@ -96,6 +98,9 @@ async def invoke_codex_cli(
     else:
         # Specify sandbox mode only (approval mode not available for exec subcommand)
         command.extend(["-s", sandbox_mode])
+
+    if thinking_model:
+        command.extend(["--thinking", thinking_model])
 
     # Add delimiter to ensure any leading dashes in prompt
     # are treated as positional text, not CLI flags
@@ -194,6 +199,7 @@ async def codex_delegate(
         "read-only", "workspace-write", "danger-full-access"
     ] = "workspace-write",
     output_format: Literal["diff", "full_file", "explanation"] = "diff",
+    thinking_model: Optional[Literal["low", "medium", "high"]] = None,
 ) -> str:
     """
     Leverage Codex's advanced analytical capabilities for code comprehension and
@@ -215,6 +221,8 @@ async def codex_delegate(
         execution_mode: Approval strategy (default: on-failure)
         sandbox_mode: File access mode (forced to read-only unless --allow-write)
         output_format: How to format the analysis results
+        thinking_model: Optional hint for Codex's reasoning depth. If not
+            provided, a heuristic based on task complexity will be used.
 
     Returns:
         Detailed analysis, recommendations, or implementation plan
@@ -252,6 +260,12 @@ async def codex_delegate(
             ],
         }
 
+    thinking_model = (
+        thinking_model
+        if thinking_model is not None
+        else dde.determine_thinking_model(task_description)
+    )
+
     # 3. Check cache
     cached_result = result_cache.get(
         task_description,
@@ -259,6 +273,7 @@ async def codex_delegate(
         execution_mode,
         effective_sandbox_mode,
         output_format,
+        thinking_model,
     )
     if cached_result:
         # Parse cached result and add cache flag
@@ -277,6 +292,7 @@ async def codex_delegate(
             "status": "rejected",
             "message": "The task is not suitable for delegation to Codex CLI",
             "reason": "Task not suitable for Codex delegation",
+            "thinking_model": thinking_model,
         }
         return json.dumps(rejection_result, indent=2, ensure_ascii=False)
 
@@ -292,6 +308,7 @@ async def codex_delegate(
             execution_mode,
             effective_sandbox_mode,
             allow_write,
+            thinking_model=thinking_model,
         )
 
         # 6. Parse output
@@ -309,6 +326,7 @@ async def codex_delegate(
                 "codex_prompt": (
                     codex_prompt if codex_prompt != task_description else None
                 ),
+                "thinking_model": thinking_model,
             }
         )
 
@@ -332,6 +350,7 @@ async def codex_delegate(
                 execution_mode,
                 effective_sandbox_mode,
                 output_format,
+                thinking_model,
                 result_json,
             )
         except Exception as cache_error:
@@ -351,6 +370,7 @@ async def codex_delegate(
             "sandbox_mode": effective_sandbox_mode,
             "requested_sandbox_mode": sandbox_mode,
             "optimization_note": "",  # No optimization applied on error
+            "thinking_model": thinking_model,
         }
 
         # Add operation mode notice if applicable

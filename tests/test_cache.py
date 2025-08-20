@@ -31,13 +31,13 @@ class TestResultCache(unittest.TestCase):
     def test_cache_key_generation(self):
         """测试缓存键生成"""
         key1 = self.cache._generate_cache_key(
-            "task1", "/dir1", "mode1", "sandbox1", "format1", "hash1"
+            "task1", "/dir1", "mode1", "sandbox1", "format1", "low", "hash1"
         )
         key2 = self.cache._generate_cache_key(
-            "task1", "/dir1", "mode1", "sandbox1", "format1", "hash1"
+            "task1", "/dir1", "mode1", "sandbox1", "format1", "low", "hash1"
         )
         key3 = self.cache._generate_cache_key(
-            "task2", "/dir1", "mode1", "sandbox1", "format1", "hash1"
+            "task2", "/dir1", "mode1", "sandbox1", "format1", "low", "hash1"
         )
 
         # 相同参数应生成相同键
@@ -70,15 +70,25 @@ class TestResultCache(unittest.TestCase):
         """测试缓存存储和获取"""
         # 设置缓存
         self.cache.set(
-            "task1", self.temp_dir, "mode1", "sandbox1", "format1", "result1"
+            "task1",
+            self.temp_dir,
+            "mode1",
+            "sandbox1",
+            "format1",
+            "low",
+            "result1",
         )
 
         # 获取缓存
-        result = self.cache.get("task1", self.temp_dir, "mode1", "sandbox1", "format1")
+        result = self.cache.get(
+            "task1", self.temp_dir, "mode1", "sandbox1", "format1", "low"
+        )
         self.assertEqual(result, "result1")
 
         # 获取不存在的缓存
-        result = self.cache.get("task2", self.temp_dir, "mode1", "sandbox1", "format1")
+        result = self.cache.get(
+            "task2", self.temp_dir, "mode1", "sandbox1", "format1", "low"
+        )
         self.assertIsNone(result)
 
     def test_cache_expiration(self):
@@ -90,19 +100,35 @@ class TestResultCache(unittest.TestCase):
         with patch("time.time") as mock_time:
             mock_time.return_value = 1000
             short_cache.set(
-                "task1", self.temp_dir, "mode1", "sandbox1", "format1", "result1"
+                "task1",
+                self.temp_dir,
+                "mode1",
+                "sandbox1",
+                "format1",
+                "low",
+                "result1",
             )
 
             # 立即获取应该成功
             result = short_cache.get(
-                "task1", self.temp_dir, "mode1", "sandbox1", "format1"
+                "task1",
+                self.temp_dir,
+                "mode1",
+                "sandbox1",
+                "format1",
+                "low",
             )
             self.assertEqual(result, "result1")
 
             # 时间前进，触发过期
             mock_time.return_value = 1002
             result = short_cache.get(
-                "task1", self.temp_dir, "mode1", "sandbox1", "format1"
+                "task1",
+                self.temp_dir,
+                "mode1",
+                "sandbox1",
+                "format1",
+                "low",
             )
             self.assertIsNone(result)
 
@@ -112,10 +138,22 @@ class TestResultCache(unittest.TestCase):
 
         # 添加缓存条目
         small_cache.set(
-            "task1", self.temp_dir, "mode1", "sandbox1", "format1", "result1"
+            "task1",
+            self.temp_dir,
+            "mode1",
+            "sandbox1",
+            "format1",
+            "low",
+            "result1",
         )
         small_cache.set(
-            "task2", self.temp_dir, "mode2", "sandbox1", "format1", "result2"
+            "task2",
+            self.temp_dir,
+            "mode2",
+            "sandbox1",
+            "format1",
+            "low",
+            "result2",
         )
 
         # 此时缓存应该有2个条目
@@ -123,28 +161,50 @@ class TestResultCache(unittest.TestCase):
 
         # 添加第三个条目，应该驱逐最旧的
         small_cache.set(
-            "task3", self.temp_dir, "mode3", "sandbox1", "format1", "result3"
+            "task3",
+            self.temp_dir,
+            "mode3",
+            "sandbox1",
+            "format1",
+            "low",
+            "result3",
         )
 
         # 缓存仍然应该只有2个条目
         self.assertEqual(len(small_cache.cache), 2)
 
         # task1 应该被驱逐了
-        result = small_cache.get("task1", self.temp_dir, "mode1", "sandbox1", "format1")
+        result = small_cache.get(
+            "task1", self.temp_dir, "mode1", "sandbox1", "format1", "low"
+        )
         self.assertIsNone(result)
 
         # task3 应该存在
-        result = small_cache.get("task3", self.temp_dir, "mode3", "sandbox1", "format1")
+        result = small_cache.get(
+            "task3", self.temp_dir, "mode3", "sandbox1", "format1", "low"
+        )
         self.assertEqual(result, "result3")
 
     def test_cache_stats(self):
         """测试缓存统计"""
         # 添加一些缓存条目
         self.cache.set(
-            "task1", self.temp_dir, "mode1", "sandbox1", "format1", "result1"
+            "task1",
+            self.temp_dir,
+            "mode1",
+            "sandbox1",
+            "format1",
+            "low",
+            "result1",
         )
         self.cache.set(
-            "task2", self.temp_dir, "mode2", "sandbox1", "format1", "result2"
+            "task2",
+            self.temp_dir,
+            "mode2",
+            "sandbox1",
+            "format1",
+            "low",
+            "result2",
         )
 
         stats = self.cache.get_stats()
@@ -160,10 +220,22 @@ class TestResultCache(unittest.TestCase):
         expired_cache = ResultCache(ttl=1, max_size=10)
 
         expired_cache.set(
-            "task1", self.temp_dir, "mode1", "sandbox1", "format1", "result1"
+            "task1",
+            self.temp_dir,
+            "mode1",
+            "sandbox1",
+            "format1",
+            "low",
+            "result1",
         )
         expired_cache.set(
-            "task2", self.temp_dir, "mode2", "sandbox1", "format1", "result2"
+            "task2",
+            self.temp_dir,
+            "mode2",
+            "sandbox1",
+            "format1",
+            "low",
+            "result2",
         )
 
         # 等待过期
@@ -171,7 +243,13 @@ class TestResultCache(unittest.TestCase):
 
         # 添加新的条目（不过期）
         expired_cache.set(
-            "task3", self.temp_dir, "mode3", "sandbox1", "format1", "result3"
+            "task3",
+            self.temp_dir,
+            "mode3",
+            "sandbox1",
+            "format1",
+            "low",
+            "result3",
         )
 
         # 清理过期条目
@@ -187,10 +265,22 @@ class TestResultCache(unittest.TestCase):
         """测试缓存清空"""
         # 添加一些缓存条目
         self.cache.set(
-            "task1", self.temp_dir, "mode1", "sandbox1", "format1", "result1"
+            "task1",
+            self.temp_dir,
+            "mode1",
+            "sandbox1",
+            "format1",
+            "low",
+            "result1",
         )
         self.cache.set(
-            "task2", self.temp_dir, "mode2", "sandbox1", "format1", "result2"
+            "task2",
+            self.temp_dir,
+            "mode2",
+            "sandbox1",
+            "format1",
+            "low",
+            "result2",
         )
 
         # 确认有条目

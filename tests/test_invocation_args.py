@@ -90,6 +90,32 @@ class TestInvocationArgs(unittest.IsolatedAsyncioTestCase):
             self.assertIn("--", cmd)
             self.assertEqual(cmd[-1], prompt)
 
+    async def test_thinking_model_included_when_provided(self):
+        captured_args = {}
+
+        async def fake_subprocess_exec(*cmd, **kwargs):
+            captured_args["cmd"] = list(cmd)
+            return DummyProcess(returncode=0, stdout=b"ok", stderr=b"")
+
+        with patch.object(
+            asyncio, "create_subprocess_exec", side_effect=fake_subprocess_exec
+        ):
+            os.environ["CODEX_ALLOW_WRITE"] = "false"
+
+            await invoke_codex_cli(
+                prompt="Analyze",
+                working_directory="/tmp",
+                execution_mode="on-failure",
+                sandbox_mode="read-only",
+                allow_write=False,
+                thinking_model="high",
+            )
+
+            cmd = captured_args["cmd"]
+            self.assertIn("--thinking", cmd)
+            # "high" should follow the flag
+            self.assertEqual(cmd[cmd.index("--thinking") + 1], "high")
+
 
 if __name__ == "__main__":
     unittest.main()

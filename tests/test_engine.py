@@ -57,6 +57,30 @@ class TestDelegationDecisionEngine(unittest.TestCase):
             result = self.dde.validate_working_directory(path)
             self.assertFalse(result, f"危险路径 {path} 应该被拒绝")
 
+    def test_determine_thinking_model(self):
+        """Test thinking model selection based on task complexity."""
+        self.assertEqual(
+            self.dde.determine_thinking_model("short task"),
+            "low",
+        )
+        medium_task = (
+            "Refactor the module, add new features, ensure broad compatibility, "
+            "and update tests"
+        )
+        self.assertEqual(
+            self.dde.determine_thinking_model(medium_task),
+            "medium",
+        )
+        high_task = (
+            "Investigate the performance characteristics of the entire system, "
+            "including database interactions, caching strategies, and edge "
+            "cases across multiple services under various load conditions."
+        )
+        self.assertEqual(
+            self.dde.determine_thinking_model(high_task),
+            "high",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

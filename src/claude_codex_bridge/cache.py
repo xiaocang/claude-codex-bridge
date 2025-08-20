@@ -40,6 +40,7 @@ class ResultCache:
         execution_mode: str,
         sandbox_mode: str,
         output_format: str,
+        thinking_model: str,
         files_hash: Optional[str] = None,
     ) -> str:
         """
@@ -53,6 +54,7 @@ class ResultCache:
             execution_mode: Execution mode
             sandbox_mode: Sandbox mode
             output_format: Output format
+            thinking_model: Codex thinking model level
             files_hash: File content hash value
 
         Returns:
@@ -65,6 +67,7 @@ class ResultCache:
             "exec_mode": execution_mode,
             "sandbox_mode": sandbox_mode,
             "output_format": output_format,
+            "thinking_model": thinking_model,
             "files_hash": files_hash or "none",
         }
 
@@ -134,6 +137,7 @@ class ResultCache:
         execution_mode: str,
         sandbox_mode: str,
         output_format: str,
+        thinking_model: str,
     ) -> Optional[str]:
         """
         Get result from cache.
@@ -144,6 +148,7 @@ class ResultCache:
             execution_mode: Execution mode
             sandbox_mode: Sandbox mode
             output_format: Output format
+            thinking_model: Codex thinking model level
 
         Returns:
             Cached result (JSON string), or None if it does not exist
@@ -158,6 +163,7 @@ class ResultCache:
             execution_mode,
             sandbox_mode,
             output_format,
+            thinking_model,
             files_hash,
         )
 
@@ -185,6 +191,7 @@ class ResultCache:
         execution_mode: str,
         sandbox_mode: str,
         output_format: str,
+        thinking_model: str,
         result: str,
     ) -> None:
         """
@@ -196,6 +203,7 @@ class ResultCache:
             execution_mode: Execution mode
             sandbox_mode: Sandbox mode
             output_format: Output format
+            thinking_model: Codex thinking model level
             result: The result to be cached (JSON string)
         """
         # Calculate file hash
@@ -208,6 +216,7 @@ class ResultCache:
             execution_mode,
             sandbox_mode,
             output_format,
+            thinking_model,
             files_hash,
         )
 
