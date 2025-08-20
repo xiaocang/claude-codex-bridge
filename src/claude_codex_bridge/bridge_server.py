@@ -53,6 +53,7 @@ async def invoke_codex_cli(
     working_directory: str,
     execution_mode: str,
     sandbox_mode: str,
+    task_complexity: Literal["low", "medium", "high"] = "medium",
     allow_write: bool = True,
     timeout: int = 300,  # 5 minute timeout
 ) -> Tuple[str, str]:
@@ -64,6 +65,7 @@ async def invoke_codex_cli(
         working_directory: Codex working directory
         execution_mode: Codex CLI approval strategy mode
         sandbox_mode: Codex CLI sandbox strategy mode
+        task_complexity: Desired model reasoning effort level (default: "medium")
         allow_write: Whether to allow file write operations
         timeout: Command timeout in seconds
 
@@ -96,6 +98,9 @@ async def invoke_codex_cli(
     else:
         # Specify sandbox mode only (approval mode not available for exec subcommand)
         command.extend(["-s", sandbox_mode])
+
+    # Configure model reasoning effort based on task complexity
+    command.extend(["-c", f'model_reasoning_effort="{task_complexity}"'])
 
     # Add delimiter to ensure any leading dashes in prompt
     # are treated as positional text, not CLI flags
@@ -194,6 +199,7 @@ async def codex_delegate(
         "read-only", "workspace-write", "danger-full-access"
     ] = "workspace-write",
     output_format: Literal["diff", "full_file", "explanation"] = "diff",
+    task_complexity: Literal["low", "medium", "high"] = "medium",
 ) -> str:
     """
     Leverage Codex's advanced analytical capabilities for code comprehension and
@@ -215,6 +221,7 @@ async def codex_delegate(
         execution_mode: Approval strategy (default: on-failure)
         sandbox_mode: File access mode (forced to read-only unless --allow-write)
         output_format: How to format the analysis results
+        task_complexity: Guidance for Codex's reasoning effort (default: "medium")
 
     Returns:
         Detailed analysis, recommendations, or implementation plan
@@ -299,6 +306,7 @@ async def codex_delegate(
             working_directory,
             execution_mode,
             effective_sandbox_mode,
+            task_complexity,
             allow_write,
         )
 
