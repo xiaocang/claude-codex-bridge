@@ -185,12 +185,12 @@ cp .mcp.json.example .mcp.json
 
 **Planning Phase (Read-Only):**
 ```
-/mcp__codex-planning__codex_delegate "Analyze the authentication system for security vulnerabilities" --working_directory "/path/to/your/project"
+/mcp__codex-planning__codex_delegate "Analyze the authentication system for security vulnerabilities" --working_directory "/path/to/your/project" --task_complexity high
 ```
 
 **Execution Phase (Write-Enabled):**
 ```
-/mcp__codex-execution__codex_delegate "Implement the security fixes we planned earlier" --working_directory "/path/to/your/project"
+/mcp__codex-execution__codex_delegate "Implement the security fixes we planned earlier" --working_directory "/path/to/your/project" --task_complexity high
 ```
 
 ## Main Tools
@@ -212,6 +212,7 @@ Leverage Codex's advanced analytical capabilities for code comprehension and str
 - `execution_mode` (optional): Approval strategy (default: on-failure)
 - `sandbox_mode` (optional): File access mode (forced to read-only unless --allow-write)
 - `output_format` (optional): How to format the analysis results (diff/full_file/explanation)
+- `task_complexity` (optional): Model reasoning effort (low/medium/high)
 
 **Planning Mode Example**:
 ```json
@@ -220,7 +221,8 @@ Leverage Codex's advanced analytical capabilities for code comprehension and str
   "working_directory": "/Users/username/my-project",
   "execution_mode": "on-failure",
   "sandbox_mode": "read-only",
-  "output_format": "explanation"
+  "output_format": "explanation",
+  "task_complexity": "medium"
 }
 ```
 
@@ -231,7 +233,8 @@ Leverage Codex's advanced analytical capabilities for code comprehension and str
   "working_directory": "/Users/username/my-project",
   "execution_mode": "on-failure",
   "sandbox_mode": "workspace-write",
-  "output_format": "diff"
+  "output_format": "diff",
+  "task_complexity": "high"
 }
 ```
 
