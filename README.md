@@ -272,7 +272,7 @@ MAX_CACHE_SIZE=100      # Maximum cache entries
 
 ## Version History
 
-### v0.1.2rc1
+### v0.1.2
 - 🆕 Support specifying task complexity when invoking Codex
 - ⏱️ Increase default timeout to 1 hour for Codex CLI operations
 
