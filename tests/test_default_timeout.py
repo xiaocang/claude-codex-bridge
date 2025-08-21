@@ -52,16 +52,7 @@ class TestDefaultTimeout(unittest.IsolatedAsyncioTestCase):
                         sandbox_mode="read-only",
                         task_complexity="medium",
                         allow_write=False,
-                with patch.dict(os.environ, {"CODEX_ALLOW_WRITE": "false"}):
-                    with tempfile.TemporaryDirectory() as tmpdir:
-                        await invoke_codex_cli(
-                            prompt="Analyze code",
-                            working_directory=tmpdir,
-                            execution_mode="on-failure",
-                            sandbox_mode="read-only",
-                            task_complexity="medium",
-                            allow_write=False,
-                        )
+                    )
 
         self.assertEqual(captured_timeout["timeout"], 3600)
 

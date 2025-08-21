@@ -65,3 +65,6 @@ include = [
     "LICENSE",
     "pyproject.toml",
 ]
+
+[tool.black]
+target-version = ["py311", "py312"]
