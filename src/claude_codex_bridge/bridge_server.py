@@ -209,18 +209,18 @@ async def codex_delegate(
     Leverage Codex's advanced analytical capabilities for code comprehension and
     planning.
 
-    Codex specializes in:
-    • Analyzing complex codebases and identifying improvement opportunities
+    Codex excels at reading and analyzing specific code files by filename and specializes in:
+    • Precise file analysis when given explicit file paths (e.g., src/auth.py, tests/test_auth.py)
     • Designing architectural solutions and refactoring strategies
-    • Planning implementation approaches for new features
-    • Generating comprehensive test strategies
+    • Planning implementation approaches and generating test strategies
     • Reviewing code for quality, security, and performance issues
+    • Change impact mapping across codebases
 
     Evaluate each task's difficulty and set `task_complexity` to "low",
     "medium", or "high" so Codex can allocate appropriate reasoning effort.
 
-    By default, operates in read-only mode to focus on analysis and planning.
-    Enable write mode with --allow-write flag when ready to apply changes.
+    Note: Codex operates in read-only mode by default and produces analyses, plans, and proposed diffs.
+    It never directly modifies source code - changes should be applied via Claude Code's editing tools.
 
     Args:
         task_description: Describe what you want Codex to analyze or plan
