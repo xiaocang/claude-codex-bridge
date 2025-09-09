@@ -49,6 +49,10 @@ cache_ttl = int(os.environ.get("CACHE_TTL", "3600"))  # Default 1 hour
 cache_max_size = int(os.environ.get("MAX_CACHE_SIZE", "100"))  # Default 100 entries
 result_cache = ResultCache(ttl=cache_ttl, max_size=cache_max_size)
 
+# Backward-compatible single-line delimiter; can be overridden via env var
+# Default mirrors historical behavior used by older tests/clients
+FINAL_OUTPUT_DELIMITER: str = os.environ.get("FINAL_OUTPUT_DELIMITER", "=x=x=x=x=x=x=x=")
+
 # Write operations will be checked dynamically in codex_delegate function
 
 
@@ -229,7 +233,8 @@ def parse_codex_output(
     # Default delimiters and strict mode
     default_start_delimiter = "--[=["
     default_end_delimiter = "]=]--"
-    default_strict = True
+    default_strict = False
+    # Backward-compatible single-line delimiter available as module-level constant
 
     # Handle delimiter extraction
     processed = stdout
@@ -256,6 +261,11 @@ def parse_codex_output(
         if extracted_content is not None:
             processed = extracted_content
             has_delimiter = True
+        else:
+            # Fallback to legacy single delimiter if present
+            if FINAL_OUTPUT_DELIMITER in stdout:
+                processed = _extract_after_delimiter(stdout, FINAL_OUTPUT_DELIMITER)
+                has_delimiter = True
 
     # Check strict mode
     resolved_strict = strict if strict is not None else default_strict
@@ -267,7 +277,8 @@ def parse_codex_output(
             expected_delimiters = f"'{delimiter}'"
         else:
             expected_delimiters = (
-                f"'{default_start_delimiter}' and '{default_end_delimiter}'"
+                f"'{default_start_delimiter}' and '{default_end_delimiter}', "
+                f"or the legacy '{FINAL_OUTPUT_DELIMITER}'"
             )
 
         return {
@@ -346,11 +357,13 @@ async def codex_delegate(
         working_directory: Project directory to analyze
         execution_mode: Approval strategy (default: on-failure)
         sandbox_mode: File access mode (forced to read-only unless --allow-write)
-        output_format: How to format the analysis results
+        output_format: How to format the analysis results; the bridge also
+            injects a format-specific instruction into the prompt so the model
+            returns only the requested format inside the delimiters
         task_complexity: Guidance for Codex's reasoning effort (default: "medium")
         final_output_start_delimiter: Start delimiter for output extraction (default: "--[=[")
         final_output_end_delimiter: End delimiter for output extraction (default: "]=]--")
-        final_output_strict: Enable strict delimiter enforcement (default: True)
+        final_output_strict: Enable strict delimiter enforcement (default: False)
 
     Returns:
         Detailed analysis, recommendations, or implementation plan
@@ -440,7 +453,25 @@ async def codex_delegate(
         else "]=]--"
     )
 
-    # Prepend delimiter instruction to prompt
+    # Build format-specific instruction and prepend delimiter instruction to prompt
+    if output_format == "diff":
+        format_instruction = (
+            "Inside the wrapper, output a unified diff only in git patch format "
+            "starting with '--- a/' and '+++ b/' headers. Do not include code "
+            "fences, comments, or extra text."
+        )
+    elif output_format == "full_file":
+        format_instruction = (
+            "Inside the wrapper, output only the complete final file content(s) "
+            "without any code fences or commentary. If multiple files, separate "
+            "each with a line 'File: <path>' followed by the file content."
+        )
+    else:  # explanation
+        format_instruction = (
+            "Inside the wrapper, output only the explanation as plain text, "
+            "with no code fences or extraneous headers."
+        )
+
     delimiter_instruction = (
         f"Please wrap your final deliverable content between {start_delimiter} and {end_delimiter} delimiters. "
         f"Place any reasoning, explanation, or process details before the {start_delimiter} delimiter, "
@@ -450,7 +481,7 @@ async def codex_delegate(
     try:
         # 5. Invoke Codex CLI
         stdout, stderr = await invoke_codex_cli(
-            f"{delimiter_instruction}\n\n{codex_prompt}",
+            f"{format_instruction}\n\n{delimiter_instruction}\n\n{codex_prompt}",
             working_directory,
             execution_mode,
             effective_sandbox_mode,
