@@ -207,7 +207,7 @@ def _extract_after_delimiter(text: str, delimiter: str) -> str:
     if idx == -1:
         return text
     # Move past delimiter
-    after = text[idx + len(delimiter) :]
+    after = text[idx + len(delimiter):]
     # Strip a single leading newline/carriage return and spaces
     return after.lstrip("\r\n ")
 
