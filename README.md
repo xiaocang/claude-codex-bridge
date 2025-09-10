@@ -42,7 +42,7 @@ graph LR
 
 ## Project Overview
 
-Claude-Codex Bridge is an **Intelligent Analysis Engine** that orchestrates task delegation between Claude Code and locally running OpenAI Codex CLI. Rather than a simple code generator, it's a sophisticated planning and analysis system with intelligent caching, security validation, and read-only safety defaults.
+Claude-Codex Bridge is an **Intelligent Analysis Engine** that orchestrates task delegation between Claude Code and locally running OpenAI Codex CLI. Rather than a simple code generator, it's a sophisticated planning and analysis system with security validation and read-only safety defaults.
 
 ## Technical Architecture
 
@@ -52,7 +52,6 @@ graph TD
     B --> C{Claude-Codex Bridge}
 
     C --> D[Delegation Decision Engine]
-    C --> E[Result Cache]
 
     C --> G[Codex CLI]
     G --> H[Local Sandbox]
@@ -66,8 +65,7 @@ graph TD
 
 1. **MCP Server**: High-performance server based on FastMCP, providing standardized tool interfaces
 2. **Delegation Decision Engine (DDE)**: Intelligently analyzes tasks and determines optimal execution strategies
-3. **Result Cache**: Intelligent caching system based on content hashes, avoiding duplicate executions
-4. **Output Parser**: Intelligently identifies and formats Codex output into structured data
+3. **Output Parser**: Intelligently identifies and formats Codex output into structured data
 
 ## Quick Start
 
@@ -238,24 +236,13 @@ Leverage Codex's advanced analytical capabilities for code comprehension and str
   "task_complexity": "high"
 }
 ```
-
-### `cache_stats`
-
-Get cache statistics and clean up expired entries.
-
-### `clear_cache`
-
-Clear all cache entries.
+ 
 
 ## Configuration Options
 
 ### Environment Variables
 
-```bash
-# Cache configuration
-CACHE_TTL=3600          # Cache TTL in seconds
-MAX_CACHE_SIZE=100      # Maximum cache entries
-```
+No special environment variables are required for caching; caching is not used by the MCP server.
 
 ### Execution Mode Explanation
 

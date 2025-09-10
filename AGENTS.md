@@ -36,6 +36,5 @@
 ## Security & Configuration Tips
 - Always use absolute `working_directory`; the engine rejects unsafe paths.
 - Prefer `read-only` or `workspace-write` sandbox modes; avoid `danger-full-access` unless necessary.
-- Environment: `CACHE_TTL`, `MAX_CACHE_SIZE` configure caching.
+- Caching is not used by the MCP server; no cache-specific env vars are required.
 - Do not commit secrets; keep timeouts and subprocess handling intact when modifying CLI invocation.
-

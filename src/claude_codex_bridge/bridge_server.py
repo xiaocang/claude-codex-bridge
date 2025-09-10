@@ -13,11 +13,9 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 from mcp.server.fastmcp import FastMCP
 
 try:
-    from .cache import ResultCache
     from .engine import DelegationDecisionEngine
 except ImportError:
     # When running directly, use absolute imports
-    from cache import ResultCache  # type: ignore[no-redef]
     from engine import DelegationDecisionEngine  # type: ignore[no-redef]
 
 # Initialize FastMCP instance
@@ -43,11 +41,6 @@ when you're ready to apply Codex's recommendations.""",
 
 # Initialize Delegation Decision Engine
 dde = DelegationDecisionEngine()
-
-# Initialize result cache
-cache_ttl = int(os.environ.get("CACHE_TTL", "3600"))  # Default 1 hour
-cache_max_size = int(os.environ.get("MAX_CACHE_SIZE", "100"))  # Default 100 entries
-result_cache = ResultCache(ttl=cache_ttl, max_size=cache_max_size)
 
 # Backward-compatible single-line delimiter; can be overridden via env var
 # Default mirrors historical behavior used by older tests/clients
@@ -328,7 +321,7 @@ async def codex_delegate(
     ] = "on-failure",
     sandbox_mode: Literal[
         "read-only", "workspace-write", "danger-full-access"
-    ] = "workspace-write",
+    ] = "read-only",
     output_format: Literal["diff", "full_file", "explanation"] = "diff",
     task_complexity: Literal["low", "medium", "high"] = "medium",
     final_output_start_delimiter: Optional[str] = None,
@@ -414,25 +407,6 @@ async def codex_delegate(
             error_result["operation_mode"] = mode_notice
 
         return json.dumps(error_result, indent=2, ensure_ascii=False)
-
-    # 3. Check cache
-    cached_result = result_cache.get(
-        task_description,
-        working_directory,
-        execution_mode,
-        effective_sandbox_mode,
-        output_format,
-    )
-    if cached_result:
-        # Parse cached result and add cache flag
-        try:
-            result_dict = json.loads(cached_result)
-            result_dict["cache_hit"] = True
-            result_dict["cache_note"] = "This result comes from the cache"
-            return json.dumps(result_dict, indent=2, ensure_ascii=False)
-        except json.JSONDecodeError:
-            # Invalid cache result format, continue with normal execution
-            pass
 
     # 3. Use DDE to decide whether to delegate
     if not dde.should_delegate(task_description):
@@ -530,25 +504,7 @@ async def codex_delegate(
         if stderr.strip():
             result["stderr"] = stderr.strip()
 
-        # Add cache flag
-        result["cache_hit"] = False
-
-        # 7. Store result in cache (only on success)
-        result_json = json.dumps(result, indent=2, ensure_ascii=False)
-        try:
-            result_cache.set(
-                task_description,
-                working_directory,
-                execution_mode,
-                effective_sandbox_mode,
-                output_format,
-                result_json,
-            )
-        except Exception as cache_error:
-            # Cache failure should not affect main functionality
-            print(f"Failed to store cache: {cache_error}")
-
-        return result_json
+        return json.dumps(result, indent=2, ensure_ascii=False)
 
     except Exception as e:
         # Handle execution errors
@@ -567,63 +523,6 @@ async def codex_delegate(
         if mode_notice:
             error_result["operation_mode"] = mode_notice
 
-        return json.dumps(error_result, indent=2, ensure_ascii=False)
-
-
-@mcp.tool()
-async def cache_stats() -> str:
-    """
-    Get cache statistics and manage cache.
-
-    Returns:
-        JSON string containing cache statistics
-    """
-    try:
-        # Clean up expired cache
-        expired_count = result_cache.cleanup_expired()
-
-        # Get statistics
-        stats = result_cache.get_stats()
-
-        stats.update({"cleaned_expired_entries": expired_count, "status": "success"})
-
-        return json.dumps(stats, indent=2, ensure_ascii=False)
-
-    except Exception as e:
-        error_result = {
-            "status": "error",
-            "message": f"Failed to get cache statistics: {str(e)}",
-            "error_type": type(e).__name__,
-        }
-        return json.dumps(error_result, indent=2, ensure_ascii=False)
-
-
-@mcp.tool()
-async def clear_cache() -> str:
-    """
-    Clears the result cache.
-
-    Returns:
-        A JSON string of the operation result.
-    """
-    try:
-        old_stats = result_cache.get_stats()
-        result_cache.clear()
-
-        result = {
-            "status": "success",
-            "message": "Cache has been cleared",
-            "cleared_entries": old_stats["total_entries"],
-        }
-
-        return json.dumps(result, indent=2, ensure_ascii=False)
-
-    except Exception as e:
-        error_result = {
-            "status": "error",
-            "message": f"Failed to clear cache: {str(e)}",
-            "error_type": type(e).__name__,
-        }
         return json.dumps(error_result, indent=2, ensure_ascii=False)
 
 
@@ -731,7 +630,7 @@ codex_delegate(
 - `on-request`: Model decides when to request approval
 - `never`: Never request approval (use with caution)
 
-**sandbox_mode** (optional, default: "workspace-write")
+**sandbox_mode** (optional, default: "read-only")
 - `read-only`: Read-only access (automatically enforced unless --allow-write)
 - `workspace-write`: Writable workspace (only available with --allow-write)
 - `danger-full-access`: Full system access (dangerous, requires --allow-write)
@@ -979,7 +878,6 @@ a structured approach: Analyze → Plan → Execute.
 
 ### Performance Tips
 - Use planning mode for complex analysis (cheaper and safer)
-- Cache results by using consistent task descriptions
 - Break large tasks into focused analysis sessions
 - Enable write mode only when ready to implement planned changes
 """

@@ -42,12 +42,7 @@ make clean                       # Clean build artifacts
 ```
 
 ### Environment Configuration
-Create a `.env` file in the project root to configure optional settings:
-```bash
-# Cache configuration
-CACHE_TTL=3600          # Cache time-to-live in seconds (default: 3600)
-MAX_CACHE_SIZE=100      # Maximum cache entries (default: 100)
-```
+Create a `.env` file in the project root to configure optional settings. No cache-specific variables are required.
 
 ## Architecture Overview
 
@@ -57,7 +52,7 @@ This is an **intelligent MCP (Model Context Protocol) server** that acts as a br
 
 **1. Bridge Server (`src/bridge_server.py`)**
 - FastMCP-based server providing standardized tool interfaces
-- Main entry point exposing tools: `codex_delegate`, `cache_stats`, `clear_cache`
+- Main entry point exposing tool: `codex_delegate`
 - Handles asynchronous Codex CLI invocation with timeout management
 - Provides MCP resources and prompt templates for common tasks
 
@@ -66,24 +61,17 @@ This is an **intelligent MCP (Model Context Protocol) server** that acts as a br
 - Validates working directory security (prevents access to system paths like `/etc`, `/usr/bin`)
 - Prepares and optimizes task prompts for Codex CLI execution
 
-**3. Result Cache (`src/cache.py`)**
-- Memory-based LRU cache with TTL (time-to-live) expiration
-- Generates cache keys from task parameters + file content hashes
-- Automatically invalidates cache when directory contents change
-- Supports cleanup of expired entries and size-based eviction
-
 ### Key Architectural Patterns
 
-**Intelligent Task Delegation**: The system doesn't just forward requests - it analyzes task descriptions, optimizes instructions, and caches results based on file content changes.
+**Intelligent Task Delegation**: The system doesn't just forward requests - it analyzes task descriptions and optimizes instructions for Codex CLI.
 
 **Security-First Design**: Working directory validation prevents path traversal attacks, and sandbox modes provide different levels of filesystem access control.
 
-**Content-Aware Caching**: Cache keys include directory content hashes, so cache automatically invalidates when files change, ensuring results stay current.
 
 ## MCP Tool Usage
 
 ### Primary Tool: `codex_delegate`
-Delegates coding tasks to OpenAI Codex CLI with intelligent prompt optimization and caching.
+Delegates coding tasks to OpenAI Codex CLI with intelligent prompt optimization.
 
 **Required Parameters:**
 - `task_description`: Natural language description of the coding task
@@ -103,10 +91,7 @@ await codex_delegate(
     sandbox_mode="workspace-write"
 )
 ```
-
-### Cache Management Tools
-- `cache_stats()`: Returns cache statistics and cleans expired entries
-- `clear_cache()`: Clears all cached results
+ 
 
 ### MCP Resources
 - `bridge://docs/usage`: Detailed usage guide
