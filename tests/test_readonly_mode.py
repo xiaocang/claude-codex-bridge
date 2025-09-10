@@ -29,15 +29,13 @@ class TestReadOnlyMode(unittest.IsolatedAsyncioTestCase):
     @patch("claude_codex_bridge.bridge_server.invoke_codex_cli")
     @patch("claude_codex_bridge.bridge_server.dde.validate_working_directory")
     @patch("claude_codex_bridge.bridge_server.dde.should_delegate")
-    @patch("claude_codex_bridge.bridge_server.result_cache.get")
     async def test_sandbox_mode_forced_to_readonly_when_write_disabled(
-        self, mock_cache_get, mock_should_delegate, mock_validate_dir, mock_invoke_codex
+        self, mock_should_delegate, mock_validate_dir, mock_invoke_codex
     ):
         """Test that sandbox_mode is forced to read-only when write is disabled."""
         # Setup mocks
         mock_validate_dir.return_value = True
         mock_should_delegate.return_value = True
-        mock_cache_get.return_value = None
         mock_invoke_codex.return_value = ("mock output", "")
 
         # Call with workspace-write but expect read-only to be enforced
@@ -66,15 +64,13 @@ class TestReadOnlyMode(unittest.IsolatedAsyncioTestCase):
     @patch("claude_codex_bridge.bridge_server.invoke_codex_cli")
     @patch("claude_codex_bridge.bridge_server.dde.validate_working_directory")
     @patch("claude_codex_bridge.bridge_server.dde.should_delegate")
-    @patch("claude_codex_bridge.bridge_server.result_cache.get")
     async def test_sandbox_mode_preserved_when_write_enabled(
-        self, mock_cache_get, mock_should_delegate, mock_validate_dir, mock_invoke_codex
+        self, mock_should_delegate, mock_validate_dir, mock_invoke_codex
     ):
         """Test that sandbox_mode is preserved when write is enabled."""
         # Setup mocks
         mock_validate_dir.return_value = True
         mock_should_delegate.return_value = True
-        mock_cache_get.return_value = None
         mock_invoke_codex.return_value = ("mock output", "")
 
         # Call with workspace-write and expect it to be preserved
@@ -102,15 +98,13 @@ class TestReadOnlyMode(unittest.IsolatedAsyncioTestCase):
     @patch("claude_codex_bridge.bridge_server.invoke_codex_cli")
     @patch("claude_codex_bridge.bridge_server.dde.validate_working_directory")
     @patch("claude_codex_bridge.bridge_server.dde.should_delegate")
-    @patch("claude_codex_bridge.bridge_server.result_cache.get")
     async def test_readonly_mode_not_overridden_when_already_readonly(
-        self, mock_cache_get, mock_should_delegate, mock_validate_dir, mock_invoke_codex
+        self, mock_should_delegate, mock_validate_dir, mock_invoke_codex
     ):
         """Test that read-only mode is not overridden when already read-only."""
         # Setup mocks
         mock_validate_dir.return_value = True
         mock_should_delegate.return_value = True
-        mock_cache_get.return_value = None
         mock_invoke_codex.return_value = ("mock output", "")
 
         # Call with read-only mode
@@ -176,54 +170,6 @@ class TestReadOnlyMode(unittest.IsolatedAsyncioTestCase):
         self.assertIn("benefits", expected_notice)
         self.assertIsInstance(expected_notice["benefits"], list)
         self.assertEqual(len(expected_notice["benefits"]), 3)
-
-    @patch("claude_codex_bridge.bridge_server.result_cache.get")
-    @patch("claude_codex_bridge.bridge_server.result_cache.set")
-    async def test_cache_uses_effective_sandbox_mode(
-        self, mock_cache_set, mock_cache_get
-    ):
-        """Test that cache operations use effective sandbox mode."""
-        with patch.dict(os.environ, {"CODEX_ALLOW_WRITE": "false"}):
-            with patch(
-                "claude_codex_bridge.bridge_server.invoke_codex_cli"
-            ) as mock_invoke:
-                with patch(
-                    "claude_codex_bridge.bridge_server.dde.validate_working_directory"
-                ) as mock_validate:
-                    with patch(
-                        "claude_codex_bridge.bridge_server.dde.should_delegate"
-                    ) as mock_should_delegate:
-                        # Setup mocks
-                        mock_validate.return_value = True
-                        mock_should_delegate.return_value = True
-                        mock_cache_get.return_value = None
-                        mock_invoke.return_value = ("mock output", "")
-
-                        await codex_delegate(
-                            task_description="Test task",
-                            working_directory="/tmp/test",
-                            sandbox_mode="workspace-write",
-                        )
-
-                        # Verify cache.get was called with effective mode (read-only)
-                        mock_cache_get.assert_called_once()
-                        cache_get_args = mock_cache_get.call_args[0]
-                        self.assertEqual(
-                            cache_get_args[2], "on-failure"
-                        )  # execution_mode
-                        self.assertEqual(
-                            cache_get_args[3], "read-only"
-                        )  # effective_sandbox_mode
-
-                        # Verify cache.set was called with effective mode (read-only)
-                        mock_cache_set.assert_called_once()
-                        cache_set_args = mock_cache_set.call_args[0]
-                        self.assertEqual(
-                            cache_set_args[2], "on-failure"
-                        )  # execution_mode
-                        self.assertEqual(
-                            cache_set_args[3], "read-only"
-                        )  # effective_sandbox_mode
 
 
 if __name__ == "__main__":
