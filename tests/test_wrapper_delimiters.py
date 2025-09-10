@@ -36,16 +36,16 @@ class TestWrappedDelimiterExtraction(unittest.TestCase):
         self.assertIsNone(result)
 
     def test_multiple_start_delimiters(self):
-        """Test when multiple start delimiters are present - should use first."""
+        """Test when multiple start delimiters are present - should use first (greedy)."""
         text = "Preamble\n--[=[\nFirst content\n--[=[\nNested content\n]=]--\nTrailing"
         result = _extract_wrapped_content(text, "--[=[", "]=]--")
         self.assertEqual(result, "\nFirst content\n--[=[\nNested content\n")
 
     def test_multiple_end_delimiters(self):
-        """Test when multiple end delimiters are present - should use first."""
+        """Test when multiple end delimiters are present - should use last (greedy)."""
         text = "Preamble\n--[=[\nContent with\n]=]--\nmore text\n]=]--\nTrailing"
         result = _extract_wrapped_content(text, "--[=[", "]=]--")
-        self.assertEqual(result, "\nContent with\n")
+        self.assertEqual(result, "\nContent with\n]=]--\nmore text\n")
 
     def test_empty_content(self):
         """Test when delimiters contain empty content."""

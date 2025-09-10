@@ -51,7 +51,9 @@ result_cache = ResultCache(ttl=cache_ttl, max_size=cache_max_size)
 
 # Backward-compatible single-line delimiter; can be overridden via env var
 # Default mirrors historical behavior used by older tests/clients
-FINAL_OUTPUT_DELIMITER: str = os.environ.get("FINAL_OUTPUT_DELIMITER", "=x=x=x=x=x=x=x=")
+FINAL_OUTPUT_DELIMITER: str = os.environ.get(
+    "FINAL_OUTPUT_DELIMITER", "=x=x=x=x=x=x=x="
+)
 
 # Write operations will be checked dynamically in codex_delegate function
 
@@ -167,7 +169,8 @@ def _extract_wrapped_content(
     text: str, start_delimiter: str, end_delimiter: str
 ) -> Optional[str]:
     """
-    Extract content between start and end delimiters.
+    Extract content between start and end delimiters using greedy matching.
+    Uses the first start delimiter and the last end delimiter to maximize content range.
 
     Args:
         text: Input text to search
@@ -177,14 +180,15 @@ def _extract_wrapped_content(
     Returns:
         Content between delimiters, or None if not found properly
     """
+    # Find the first occurrence of the start delimiter
     start_idx = text.find(start_delimiter)
     if start_idx == -1:
         return None
 
-    # Look for end delimiter after the start delimiter
+    # Find the last occurrence of the end delimiter after the start delimiter
     search_start = start_idx + len(start_delimiter)
-    end_idx = text.find(end_delimiter, search_start)
-    if end_idx == -1:
+    end_idx = text.rfind(end_delimiter)
+    if end_idx == -1 or end_idx < search_start:
         return None
 
     # Extract content between delimiters
@@ -493,8 +497,8 @@ async def codex_delegate(
         result = parse_codex_output(
             stdout,
             output_format,
-            start_delimiter=final_output_start_delimiter,
-            end_delimiter=final_output_end_delimiter,
+            start_delimiter=start_delimiter,
+            end_delimiter=end_delimiter,
             strict=final_output_strict,
         )
 
