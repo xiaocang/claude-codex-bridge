@@ -242,7 +242,7 @@ Leverage Codex's advanced analytical capabilities for code comprehension and str
 
 ### Environment Variables
 
-No special environment variables are required for caching; caching is not used by the MCP server.
+No environment variables are required for configuration.
 
 ### Execution Mode Explanation
 
