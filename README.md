@@ -257,6 +257,21 @@ No environment variables are required for configuration.
 - **workspace-write**: Writable workspace, suitable for most development tasks
 - **danger-full-access**: Full access, use with caution
 
+### Wrapper Output Delimiters
+
+By default, the bridge asks the model to wrap its final deliverable content between wrapper delimiters and then extracts only the wrapped section:
+
+- Default start/end: `--[=[` and `]=]--` (Lua-style long bracket form)
+- Customize via tool parameters: set `final_output_start_delimiter` and `final_output_end_delimiter` on `codex_delegate`
+- Strict mode: set `final_output_strict=true` to error when delimiters are missing
+
+Important: When referencing these delimiters in the instruction text (the prompt that describes how to format output), escape square brackets so they are not mistaken as the actual wrapper. For example:
+
+- Show as `--\[=\[` and `\]=]--` in the instruction
+- Then clarify that `\[`/`\]` are escapes only; the actual output should use unescaped delimiters
+
+The server already applies this escaping in its own instructions to avoid premature parsing when models echo guidance.
+
 ## Version History
 
 ### v0.1.2

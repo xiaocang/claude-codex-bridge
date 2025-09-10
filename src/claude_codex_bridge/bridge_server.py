@@ -205,6 +205,19 @@ def _extract_after_delimiter(text: str, delimiter: str) -> str:
     return after.lstrip()
 
 
+def _escape_delimiter_for_display(delimiter: str) -> str:
+    """
+    Return a display-safe representation of a delimiter for inclusion in
+    natural-language instructions without creating an exact match that could
+    be mistaken for the actual delimiter in model output.
+
+    Currently escapes square brackets by prefixing them with a backslash,
+    which prevents accidental early recognition when using Lua-style long
+    bracket delimiters like "--[=[" and "]=]--".
+    """
+    return delimiter.replace("[", r"\[").replace("]", r"\]")
+
+
 def parse_codex_output(
     stdout: str,
     output_format: str,
@@ -452,13 +465,20 @@ async def codex_delegate(
             "with no code fences or extraneous headers."
         )
 
+    display_start = _escape_delimiter_for_display(start_delimiter)
+    display_end = _escape_delimiter_for_display(end_delimiter)
+
+    # Note: We intentionally use escaped delimiters in the instruction text to
+    # avoid accidental early detection if the model echoes the instruction.
+    # The model should use the actual (unescaped) delimiters in its output.
     delimiter_instruction = (
         f"Please wrap your final deliverable content between "
-        f"{start_delimiter} and {end_delimiter} delimiters. "
+        f"{display_start} and {display_end} delimiters. "
         f"Place any reasoning, explanation, or process details before the "
-        f"{start_delimiter} delimiter, "
-        f"and put only the final code, analysis, or requested output "
-        f"between the delimiters."
+        f"start delimiter, and put only the final code, analysis, or requested "
+        f"output between the delimiters. "
+        f"Note: In this instruction, '[' and ']' are escaped with backslashes; "
+        f"do not include backslashes in the actual delimiters in your output."
     )
 
     try:
