@@ -365,8 +365,10 @@ async def codex_delegate(
             injects a format-specific instruction into the prompt so the model
             returns only the requested format inside the delimiters
         task_complexity: Guidance for Codex's reasoning effort (default: "medium")
-        final_output_start_delimiter: Start delimiter for output extraction (default: "--[=[")
-        final_output_end_delimiter: End delimiter for output extraction (default: "]=]--")
+        final_output_start_delimiter: Start delimiter for output extraction
+            (default: "--[=[")
+        final_output_end_delimiter: End delimiter for output extraction
+            (default: "]=]--")
         final_output_strict: Enable strict delimiter enforcement (default: False)
 
     Returns:
@@ -477,9 +479,12 @@ async def codex_delegate(
         )
 
     delimiter_instruction = (
-        f"Please wrap your final deliverable content between {start_delimiter} and {end_delimiter} delimiters. "
-        f"Place any reasoning, explanation, or process details before the {start_delimiter} delimiter, "
-        f"and put only the final code, analysis, or requested output between the delimiters."
+        f"Please wrap your final deliverable content between "
+        f"{start_delimiter} and {end_delimiter} delimiters. "
+        f"Place any reasoning, explanation, or process details before the "
+        f"{start_delimiter} delimiter, "
+        f"and put only the final code, analysis, or requested output "
+        f"between the delimiters."
     )
 
     try:

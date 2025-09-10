@@ -13,7 +13,10 @@ class TestWrappedDelimiterExtraction(unittest.TestCase):
 
     def test_normal_extraction(self):
         """Test normal case with wrapped content."""
-        text = "Some preamble text\n--[=[\nThis is the content\nMultiple lines\n]=]--\nSome trailing text"
+        text = (
+            "Some preamble text\n--[=[\nThis is the content\n"
+            "Multiple lines\n]=]--\nSome trailing text"
+        )
         result = _extract_wrapped_content(text, "--[=[", "]=]--")
         self.assertEqual(result, "\nThis is the content\nMultiple lines\n")
 
@@ -36,7 +39,7 @@ class TestWrappedDelimiterExtraction(unittest.TestCase):
         self.assertIsNone(result)
 
     def test_multiple_start_delimiters(self):
-        """Test when multiple start delimiters are present - should use first (greedy)."""
+        """Test multiple start delimiters - should use first (greedy)."""
         text = "Preamble\n--[=[\nFirst content\n--[=[\nNested content\n]=]--\nTrailing"
         result = _extract_wrapped_content(text, "--[=[", "]=]--")
         self.assertEqual(result, "\nFirst content\n--[=[\nNested content\n")
@@ -79,12 +82,12 @@ class TestParseCodexOutputWithWrapperDelimiters(unittest.TestCase):
         """Test parsing with wrapper delimiters."""
         stdout = """
         Some reasoning and process output here.
-        
+
         --[=[
         def hello():
             return "Hello World"
         ]=]--
-        
+
         Additional trailing output.
         """
         result = parse_codex_output(
@@ -140,12 +143,12 @@ class TestParseCodexOutputWithWrapperDelimiters(unittest.TestCase):
         """Test using default wrapper delimiters."""
         stdout = """
         Some reasoning and process output here.
-        
+
         --[=[
         def hello():
             return "Hello World"
         ]=]--
-        
+
         Additional trailing output.
         """
         result = parse_codex_output(stdout, "diff", strict=True)
@@ -158,7 +161,7 @@ class TestParseCodexOutputWithWrapperDelimiters(unittest.TestCase):
         """Test that content type detection works on extracted content."""
         stdout = """
         This is reasoning text that should be ignored.
-        
+
         --[=[
         --- a/test.py
         +++ b/test.py
@@ -167,7 +170,7 @@ class TestParseCodexOutputWithWrapperDelimiters(unittest.TestCase):
         -    return "old"
         +    return "new"
         ]=]--
-        
+
         More trailing content.
         """
         result = parse_codex_output(stdout, "diff", strict=True)

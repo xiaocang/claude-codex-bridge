@@ -1,8 +1,6 @@
-import os
 import unittest
-from unittest.mock import patch
 
-from claude_codex_bridge.bridge_server import FINAL_OUTPUT_DELIMITER, parse_codex_output
+from claude_codex_bridge.bridge_server import parse_codex_output
 
 
 class TestDelimiterStrictMode(unittest.TestCase):
