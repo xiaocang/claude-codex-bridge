@@ -84,19 +84,22 @@ test_wrapper_delimiter_extraction() {
     log_info "Testing wrapper delimiter extraction..."
 
     # Create a mock Codex response with wrapper delimiters
-    local mock_response="Some reasoning and process output here.
+local mock_response=$(cat <<'EOF'
+Some reasoning and process output here.
 This should be filtered out.
 
 --[=[
 def hello_world():
-    return \"Hello from Codex!\"
+    return "Hello from Codex!"
 
 # This is the actual deliverable content
 print(hello_world())
 ]=]--
 
 Additional trailing content that should be ignored.
-More reasoning that should not appear in final output."
+More reasoning that should not appear in final output.
+EOF
+)
 
     # Create a temporary Python script to test the parsing
     cat > "$TEMP_DIR/test_parsing.py" << EOF
