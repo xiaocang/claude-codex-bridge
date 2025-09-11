@@ -38,7 +38,7 @@ Codex excels at:
 • Code review and optimization suggestions
 
 Callers should assess each task's difficulty and set the
-`task_complexity` parameter ("low", "medium", or "high") accordingly to
+`task_complexity` parameter ("minimal", "low", "medium", or "high") accordingly to
 guide Codex's reasoning effort."""
 
     if allow_write:
@@ -90,10 +90,12 @@ def _get_codex_backend() -> str:
 async def invoke_codex_cli(
     prompt: str,
     working_directory: str,
-    execution_mode: str,
+    approval_policy: str,
     sandbox_mode: str,
-    task_complexity: Literal["low", "medium", "high"] = "medium",
+    task_complexity: Literal["minimal", "low", "medium", "high"] = "medium",
     allow_write: bool = True,
+    model_max_output_tokens: int = 100000,
+    tools_web_search: bool = False,
     timeout: int = 3600,  # 1 hour timeout
 ) -> Tuple[str, str]:
     """
@@ -102,10 +104,12 @@ async def invoke_codex_cli(
     Args:
         prompt: The main instruction to send to Codex CLI
         working_directory: Codex working directory
-        execution_mode: Codex CLI approval strategy mode
+        approval_policy: Codex CLI approval strategy mode
         sandbox_mode: Codex CLI sandbox strategy mode
         task_complexity: Desired model reasoning effort level (default: "medium")
         allow_write: Whether to allow file write operations
+        model_max_output_tokens: Maximum tokens the model can generate (default: 100000)
+        tools_web_search: Enable web search tool (default: False)
         timeout: Command timeout in seconds
 
     Returns:
@@ -128,7 +132,7 @@ async def invoke_codex_cli(
 
     # Use convenience mode or specify parameters separately
     if (
-        execution_mode == "on-failure"
+        approval_policy == "on-failure"
         and sandbox_mode == "workspace-write"
         and allow_write
     ):
@@ -138,8 +142,13 @@ async def invoke_codex_cli(
         # Specify sandbox mode only (approval mode not available for exec subcommand)
         command.extend(["-s", sandbox_mode])
 
-    # Configure model reasoning effort based on task complexity
+    # Configure model reasoning effort, max output tokens, and tools
     command.extend(["-c", f'model_reasoning_effort="{task_complexity}"'])
+    command.extend(["-c", f"model_max_output_tokens={model_max_output_tokens}"])
+    command.extend([
+        "-c",
+        f"tools.web_search={'true' if tools_web_search else 'false'}",
+    ])
 
     # Add delimiter to ensure any leading dashes in prompt
     # are treated as positional text, not CLI flags
@@ -197,10 +206,12 @@ async def invoke_codex_cli(
 async def invoke_codex_mcp(
     prompt: str,
     working_directory: str,
-    execution_mode: str,
+    approval_policy: str,
     sandbox_mode: str,
-    task_complexity: Literal["low", "medium", "high"] = "medium",
+    task_complexity: Literal["minimal", "low", "medium", "high"] = "medium",
     allow_write: bool = True,
+    model_max_output_tokens: int = 100000,
+    tools_web_search: bool = False,
     timeout: int = 3600,
 ) -> Tuple[str, str]:
     """
@@ -209,6 +220,17 @@ async def invoke_codex_mcp(
     This function spawns `codex mcp` as a child process, performs the MCP
     handshake, discovers an appropriate execution tool, and submits the prompt.
     It returns concatenated text content from the tool result.
+
+    Args:
+        prompt: The main instruction to send to Codex MCP
+        working_directory: Codex working directory
+        approval_policy: Approval strategy
+        sandbox_mode: Sandbox strategy
+        task_complexity: Desired model reasoning effort level (default: "medium")
+        allow_write: Whether to allow file write operations
+        model_max_output_tokens: Maximum tokens the model can generate (default: 100000)
+        tools_web_search: Enable web search tool (default: False)
+        timeout: Command timeout in seconds
     """
     # Deferred imports to avoid hard dependency on client at import time
     from datetime import timedelta
@@ -219,10 +241,27 @@ async def invoke_codex_mcp(
 
     # Build server command
     command = os.environ.get("CODEX_CMD", "codex")
-    args: List[str] = ["mcp"]
+    args: List[str] = [
+        "mcp",
+        # Configure all policies via -c (process-level config overrides)
+        "-c",
+        f'approval_policy="{approval_policy}"',
+        "-c",
+        f'sandbox_mode="{sandbox_mode}"',
+        "-c",
+        f'model_reasoning_effort="{task_complexity}"',
+    ]
 
-    # No process-level config flags are passed to codex mcp.
-    # All behavior is determined dynamically per tool call via arguments.
+    # Enforce read-only mode when writes are not allowed by clearing permissions
+    if not allow_write:
+        args.extend(["-c", "sandbox_permissions=[]"])
+
+    # Configure max output tokens and web search tool
+    args.extend(["-c", f"model_max_output_tokens={model_max_output_tokens}"])
+    args.extend([
+        "-c",
+        f"tools.web_search={'true' if tools_web_search else 'false'}",
+    ])
 
     # Construct stdio server parameters
     server = StdioServerParameters(
@@ -294,7 +333,7 @@ async def invoke_codex_mcp(
                 tools_result = await session.list_tools()
                 tool = _choose_tool(tools_result.tools)
 
-                # Build arguments using tool input schema
+                # Build arguments using tool input schema (prompt only)
                 input_schema = (
                     tool.inputSchema if isinstance(tool.inputSchema, dict) else {}
                 )
@@ -319,45 +358,10 @@ async def invoke_codex_mcp(
                     # If schema doesn't specify, try a common default
                     args_map["prompt"] = prompt
 
-                # Optional working directory
-                wd_key = _find_key(
-                    input_schema, ["working_directory", "cwd", "workspace"]
-                )
-                if wd_key is not None:
-                    args_map[wd_key] = working_directory
-
-                # Optional sandbox/write flags
-                sandbox_key = _find_key(
-                    input_schema,
-                    [
-                        "sandbox",
-                        "sandbox_mode",
-                        "sandboxPermissions",
-                        "sandbox_permissions",
-                    ],
-                )
-                if sandbox_key is not None:
-                    # Prefer passing the effective mode label
-                    args_map[sandbox_key] = sandbox_mode
-
-                allow_write_key = _find_key(
-                    input_schema, ["allow_write", "write", "writable"]
-                )
-                if allow_write_key is not None:
-                    args_map[allow_write_key] = allow_write
-
-                # Optional reasoning effort
-                effort_key = _find_key(
-                    input_schema,
-                    [
-                        "model_reasoning_effort",
-                        "reasoning_effort",
-                        "effort",
-                        "complexity",
-                    ],
-                )
-                if effort_key is not None:
-                    args_map[effort_key] = task_complexity
+                # Note: All sandbox/approval/effort settings are configured
+                # at the Codex MCP process level via CLI flags above.
+                # We only pass the prompt to the selected tool to keep
+                # interactions simple and consistent.
 
                 # Call the tool
                 result = await session.call_tool(tool.name, arguments=args_map)
@@ -616,7 +620,7 @@ Args:
     task_description: Describe what you want Codex to analyze or plan
     working_directory: Project directory to analyze
     request_id: Optional request identifier for client-side request tracking
-    execution_mode: Approval strategy (default: on-failure)"""
+    approval_policy: Approval strategy (default: on-failure)"""
 
     # Common parameters always shown
     common_args = """
@@ -651,20 +655,63 @@ async def codex_delegate(
     task_description: str,
     working_directory: str,
     request_id: Optional[str] = None,
-    execution_mode: Literal[
+    approval_policy: Literal[
         "untrusted", "on-failure", "on-request", "never"
     ] = "on-failure",
     sandbox_mode: Literal[
         "read-only", "workspace-write", "danger-full-access"
     ] = "read-only",
-    output_format: Literal["diff", "full_file", "explanation"] = "diff",
-    task_complexity: Literal["low", "medium", "high"] = "medium",
+    output_format: Literal["diff", "full_file", "explanation"] = "explanation",
+    task_complexity: Literal["minimal", "low", "medium", "high"] = "medium",
     final_output_start_delimiter: Optional[str] = None,
     final_output_end_delimiter: Optional[str] = None,
     final_output_strict: Optional[bool] = None,
+    max_output_tokens: int = 100000,
+    web_search: bool = False,
 ) -> str:
-    # Set dynamic tool description at runtime
-    codex_delegate.__doc__ = _get_tool_description()
+    """Leverage Codex's advanced analytical capabilities for
+code comprehension and planning.
+
+Codex excels at reading and analyzing specific code files by filename
+and specializes in:
+• Precise file analysis when given explicit file paths
+  (e.g., src/auth.py, tests/test_auth.py)
+• Designing architectural solutions and refactoring strategies
+• Planning implementation approaches and generating test strategies
+• Reviewing code for quality, security, and performance issues
+• Change impact mapping across codebases
+
+Evaluate each task's difficulty and set `task_complexity` to "minimal", "low",
+"medium", or "high" so Codex can allocate appropriate reasoning effort.
+
+Note: Codex operates in read-only mode by default and produces analyses,
+plans, and proposed diffs.
+It never directly modifies source code - changes should be applied via
+Claude Code's editing tools.
+
+Args:
+    task_description: Describe what you want Codex to analyze or plan
+    working_directory: Project directory to analyze
+    request_id: Optional request identifier for client-side request tracking
+    approval_policy: Approval strategy (default: on-failure)
+
+    output_format: How to format the analysis results; the bridge also
+        injects a format-specific instruction into the prompt so the model
+        returns only the requested format inside the delimiters
+    task_complexity: Guidance for Codex's reasoning effort (default: "medium")
+    max_output_tokens: Maximum tokens Codex may generate in a single response
+        (default: 100000)
+    final_output_start_delimiter: Start delimiter for output extraction
+        (default: "--[=[")
+    final_output_end_delimiter: End delimiter for output extraction
+        (default: "]=]--")
+    final_output_strict: Enable strict delimiter enforcement (default: False)
+    sandbox_mode: File access mode (forced to read-only unless --allow-write)
+    web_search: Enable Codex web search tool integration (default: False)
+
+Returns:
+    Detailed analysis, recommendations, or implementation plan"""
+
     # 1. Enforce read-only mode if write is not allowed (do this first)
     effective_sandbox_mode = sandbox_mode
     mode_notice: Optional[Dict[str, Union[str, List[str]]]] = None
@@ -774,10 +821,12 @@ async def codex_delegate(
         stdout, stderr = await invoker(
             f"{format_instruction}\n\n{delimiter_instruction}\n\n{codex_prompt}",
             working_directory,
-            execution_mode,
+            approval_policy,
             effective_sandbox_mode,
             task_complexity,
             allow_write,
+            model_max_output_tokens=max_output_tokens,
+            tools_web_search=web_search,
         )
 
         # 6. Parse output
@@ -793,7 +842,7 @@ async def codex_delegate(
         result.update(
             {
                 "working_directory": working_directory,
-                "execution_mode": execution_mode,
+                "approval_policy": approval_policy,
                 "sandbox_mode": effective_sandbox_mode,
                 "requested_sandbox_mode": sandbox_mode,
                 "optimization_note": optimization_note,
@@ -824,7 +873,7 @@ async def codex_delegate(
             "message": str(e),
             "error_type": type(e).__name__,
             "working_directory": working_directory,
-            "execution_mode": execution_mode,
+            "approval_policy": approval_policy,
             "sandbox_mode": effective_sandbox_mode,
             "requested_sandbox_mode": sandbox_mode,
             "optimization_note": "",  # No optimization applied on error
@@ -905,7 +954,7 @@ codex_delegate(
     task_description="Analyze the user authentication system for security
                      vulnerabilities",
     working_directory="/path/to/your/project",
-    execution_mode="on-failure",
+    approval_policy="on-failure",
     sandbox_mode="read-only",      # Enforced automatically
     output_format="explanation",
     task_complexity="medium"
@@ -917,7 +966,7 @@ codex_delegate(
 codex_delegate(
     task_description="Implement the planned security improvements",
     working_directory="/path/to/your/project",
-    execution_mode="on-failure",
+    approval_policy="on-failure",
     sandbox_mode="workspace-write",  # Now allowed
     output_format="diff",
     task_complexity="high"
@@ -935,7 +984,7 @@ codex_delegate(
 - Absolute path to project directory to analyze
 - Example: "/Users/username/my-project"
 
-**execution_mode** (optional, default: "on-failure")
+**approval_policy** (optional, default: "on-failure")
 - `untrusted`: Only run trusted commands (safest for analysis)
 - `on-failure`: Request approval only on failure (recommended)
 - `on-request`: Model decides when to request approval
@@ -953,7 +1002,7 @@ codex_delegate(
 
 **task_complexity** (optional, default: "medium")
 - Reflects task difficulty and guides Codex's reasoning effort
-- Choose "low", "medium", or "high" after assessing the task
+- Choose "minimal", "low", "medium", or "high" after assessing the task
 
 ## Advanced Features
 
@@ -996,7 +1045,7 @@ code blocks, or explanation text) and labels them in responses.
 ```
 task_description: "Analyze the authentication system for security vulnerabilities"
 working_directory: "/Users/username/my-web-app"
-execution_mode: "on-failure"
+approval_policy: "on-failure"
 sandbox_mode: "read-only"  # Automatically enforced
 output_format: "explanation"
 task_complexity: "medium"
@@ -1006,7 +1055,7 @@ task_complexity: "medium"
 ```
 task_description: "Design security improvements for the identified vulnerabilities"
 working_directory: "/Users/username/my-web-app"
-execution_mode: "on-failure"
+approval_policy: "on-failure"
 sandbox_mode: "read-only"  # Automatically enforced
 output_format: "explanation"
 task_complexity: "medium"
@@ -1016,7 +1065,7 @@ task_complexity: "medium"
 ```
 task_description: "Implement the planned security improvements"
 working_directory: "/Users/username/my-web-app"
-execution_mode: "on-failure"
+approval_policy: "on-failure"
 sandbox_mode: "workspace-write"  # Now allowed
 output_format: "diff"
 task_complexity: "high"
@@ -1028,7 +1077,7 @@ task_complexity: "high"
 ```
 task_description: "Analyze the database queries for performance bottlenecks"
 working_directory: "/Users/username/my-django-project"
-execution_mode: "on-failure"
+approval_policy: "on-failure"
 sandbox_mode: "read-only"
 output_format: "explanation"
 task_complexity: "medium"
@@ -1038,7 +1087,7 @@ task_complexity: "medium"
 ```
 task_description: "Apply the designed query optimizations"
 working_directory: "/Users/username/my-django-project"
-execution_mode: "on-failure"
+approval_policy: "on-failure"
 sandbox_mode: "workspace-write"
 output_format: "diff"
 task_complexity: "high"
