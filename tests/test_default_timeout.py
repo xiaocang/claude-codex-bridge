@@ -48,7 +48,7 @@ class TestDefaultTimeout(unittest.IsolatedAsyncioTestCase):
                     await invoke_codex_cli(
                         prompt="Analyze code",
                         working_directory=tmpdir,
-                        execution_mode="on-failure",
+                        approval_policy="on-failure",
                         sandbox_mode="read-only",
                         task_complexity="medium",
                         allow_write=False,

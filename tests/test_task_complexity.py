@@ -46,7 +46,7 @@ class TestTaskComplexity(unittest.IsolatedAsyncioTestCase):
                     await codex_delegate(
                         task_description="Analyze code",
                         working_directory=tmpdir,
-                        execution_mode="on-failure",
+                        approval_policy="on-failure",
                         sandbox_mode="read-only",
                         output_format="diff",
                         task_complexity="high",

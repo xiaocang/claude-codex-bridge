@@ -49,7 +49,7 @@ class TestInvocationArgs(unittest.IsolatedAsyncioTestCase):
             stdout, stderr = await invoke_codex_cli(
                 prompt=prompt,
                 working_directory="/tmp",
-                execution_mode="on-failure",
+                approval_policy="on-failure",
                 sandbox_mode="read-only",
                 allow_write=False,
             )
@@ -79,7 +79,7 @@ class TestInvocationArgs(unittest.IsolatedAsyncioTestCase):
             await invoke_codex_cli(
                 prompt=prompt,
                 working_directory="/tmp",
-                execution_mode="on-failure",
+                approval_policy="on-failure",
                 sandbox_mode="read-only",
                 allow_write=False,
             )
