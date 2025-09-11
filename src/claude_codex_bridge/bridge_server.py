@@ -615,6 +615,7 @@ Claude Code's editing tools.
 Args:
     task_description: Describe what you want Codex to analyze or plan
     working_directory: Project directory to analyze
+    request_id: Optional request identifier for client-side request tracking
     execution_mode: Approval strategy (default: on-failure)"""
 
     # Common parameters always shown
@@ -649,6 +650,7 @@ Returns:
 async def codex_delegate(
     task_description: str,
     working_directory: str,
+    request_id: Optional[str] = None,
     execution_mode: Literal[
         "untrusted", "on-failure", "on-request", "never"
     ] = "on-failure",
@@ -795,12 +797,15 @@ async def codex_delegate(
                 "sandbox_mode": effective_sandbox_mode,
                 "requested_sandbox_mode": sandbox_mode,
                 "optimization_note": optimization_note,
-                "original_task": task_description,
                 "codex_prompt": (
                     codex_prompt if codex_prompt != task_description else None
                 ),
             }
         )
+
+        # Add request_id if provided
+        if request_id is not None:
+            result["request_id"] = request_id
 
         # Add operation mode notice if applicable
         if mode_notice:
