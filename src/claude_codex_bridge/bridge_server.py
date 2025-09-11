@@ -51,6 +51,17 @@ FINAL_OUTPUT_DELIMITER: str = os.environ.get(
 # Write operations will be checked dynamically in codex_delegate function
 
 
+def _get_codex_backend() -> str:
+    """
+    Return selected Codex backend. Defaults to 'mcp' unless overridden
+    via the CODEX_BACKEND environment variable (set by --legacy-cmd).
+    """
+    backend = os.environ.get("CODEX_BACKEND", "mcp").strip().lower()
+    if backend not in {"mcp", "cli"}:
+        backend = "mcp"
+    return backend
+
+
 async def invoke_codex_cli(
     prompt: str,
     working_directory: str,
@@ -156,6 +167,211 @@ async def invoke_codex_cli(
             "codex command not found. Please ensure OpenAI Codex CLI is "
             "installed: npm install -g @openai/codex"
         )
+
+
+async def invoke_codex_mcp(
+    prompt: str,
+    working_directory: str,
+    execution_mode: str,
+    sandbox_mode: str,
+    task_complexity: Literal["low", "medium", "high"] = "medium",
+    allow_write: bool = True,
+    timeout: int = 3600,
+) -> Tuple[str, str]:
+    """
+    Invoke Codex via its MCP server interface using a non-interactive stdio client.
+
+    This function spawns `codex mcp` as a child process, performs the MCP
+    handshake, discovers an appropriate execution tool, and submits the prompt.
+    It returns concatenated text content from the tool result.
+    """
+    # Deferred imports to avoid hard dependency on client at import time
+    from mcp.client.stdio import StdioServerParameters, stdio_client
+    from mcp.client.session import ClientSession
+    import mcp.types as mcp_types
+    from datetime import timedelta
+
+    # Build server command
+    command = os.environ.get("CODEX_CMD", "codex")
+    args: List[str] = ["mcp"]
+
+    # No process-level config flags are passed to codex mcp.
+    # All behavior is determined dynamically per tool call via arguments.
+
+    # Construct stdio server parameters
+    server = StdioServerParameters(
+        command=command,
+        args=args,
+        env=None,
+        cwd=working_directory,
+    )
+
+    # Helper to select a suitable tool from list
+    def _choose_tool(tools: List[mcp_types.Tool]) -> mcp_types.Tool:
+        preferred = {
+            "codex_exec",
+            "codex_execute",
+            "codex_run",
+            "exec",
+            "execute",
+            "run",
+        }
+
+        # 1) Exact preferred name match
+        for tool in tools:
+            if tool.name in preferred:
+                return tool
+
+        # 2) Heuristic: description keywords
+        keywords = ("execute", "run", "prompt", "codex")
+        for tool in tools:
+            desc = (tool.description or "").lower()
+            if any(k in desc for k in keywords):
+                return tool
+
+        # 3) Fallback: first tool
+        if not tools:
+            raise RuntimeError("Codex MCP server exposed no tools")
+        return tools[0]
+
+    # Helper to find argument key variants
+    def _find_key(schema: Dict[str, Any], candidates: List[str]) -> Optional[str]:
+        properties: Dict[str, Any] = {}
+        if isinstance(schema, dict):
+            props = schema.get("properties")
+            if isinstance(props, dict):
+                # Coerce keys to strings for stable comparisons
+                properties = {str(k): v for k, v in props.items()}
+
+        for key in candidates:
+            if key in properties:
+                return key
+
+        # Try case-insensitive match
+        lower_map: Dict[str, str] = {k.lower(): k for k in properties.keys()}
+        for key in candidates:
+            if key.lower() in lower_map:
+                return lower_map[key.lower()]
+        return None
+
+    try:
+        async with stdio_client(server) as (read_stream, write_stream):
+            async with ClientSession(
+                read_stream,
+                write_stream,
+                read_timeout_seconds=timedelta(seconds=timeout) if timeout else None,
+            ) as session:  # type: ignore[arg-type]
+                # Initialize session
+                await session.initialize()
+
+                # Discover tools
+                tools_result = await session.list_tools()
+                tool = _choose_tool(tools_result.tools)
+
+                # Build arguments using tool input schema
+                input_schema = (
+                    tool.inputSchema if isinstance(tool.inputSchema, dict) else {}
+                )
+
+                prompt_key = _find_key(
+                    input_schema,
+                    [
+                        "prompt",
+                        "instruction",
+                        "input",
+                        "task",
+                        "query",
+                        "message",
+                        "content",
+                    ],
+                )
+
+                args_map: Dict[str, Any] = {}
+                if prompt_key is not None:
+                    args_map[prompt_key] = prompt
+                else:
+                    # If schema doesn't specify, try a common default
+                    args_map["prompt"] = prompt
+
+                # Optional working directory
+                wd_key = _find_key(
+                    input_schema, ["working_directory", "cwd", "workspace"]
+                )
+                if wd_key is not None:
+                    args_map[wd_key] = working_directory
+
+                # Optional sandbox/write flags
+                sandbox_key = _find_key(
+                    input_schema,
+                    [
+                        "sandbox",
+                        "sandbox_mode",
+                        "sandboxPermissions",
+                        "sandbox_permissions",
+                    ],
+                )
+                if sandbox_key is not None:
+                    # Prefer passing the effective mode label
+                    args_map[sandbox_key] = sandbox_mode
+
+                allow_write_key = _find_key(
+                    input_schema, ["allow_write", "write", "writable"]
+                )
+                if allow_write_key is not None:
+                    args_map[allow_write_key] = allow_write
+
+                # Optional reasoning effort
+                effort_key = _find_key(
+                    input_schema,
+                    [
+                        "model_reasoning_effort",
+                        "reasoning_effort",
+                        "effort",
+                        "complexity",
+                    ],
+                )
+                if effort_key is not None:
+                    args_map[effort_key] = task_complexity
+
+                # Call the tool
+                result = await session.call_tool(tool.name, arguments=args_map)
+
+                if result.isError:
+                    raise RuntimeError("Codex MCP tool call returned an error")
+
+                # Extract text content
+                texts: List[str] = []
+                for item in result.content or []:
+                    # item is a pydantic model (e.g., TextContent)
+                    try:
+                        if isinstance(item, mcp_types.TextContent):
+                            texts.append(item.text)
+                        else:
+                            # Attempt to coerce to string if other content types
+                            as_dict = (
+                                item.model_dump() if hasattr(item, "model_dump") else {}
+                            )
+                            if isinstance(as_dict, dict) and "text" in as_dict:
+                                texts.append(str(as_dict["text"]))
+                    except Exception:
+                        continue
+
+                stdout_text = "\n".join([t for t in texts if t])
+                return stdout_text, ""
+    except FileNotFoundError:
+        raise RuntimeError(
+            "codex command not found. Please ensure OpenAI Codex CLI is installed: "
+            "npm install -g @openai/codex"
+        )
+    except TimeoutError:
+        raise asyncio.TimeoutError(
+            f"Codex MCP execution timed out (exceeded {timeout} seconds)"
+        )
+    except OSError as exc:
+        # Process spawn or IO error
+        raise RuntimeError(f"Failed to start or communicate with codex mcp: {exc}")
+    except Exception as exc:
+        raise RuntimeError(f"Codex MCP execution failed: {exc}")
 
 
 def _extract_wrapped_content(
@@ -482,8 +698,11 @@ async def codex_delegate(
     )
 
     try:
-        # 5. Invoke Codex CLI
-        stdout, stderr = await invoke_codex_cli(
+        # 5. Invoke Codex (default MCP backend unless legacy CLI forced)
+        backend = _get_codex_backend()
+        invoker = invoke_codex_mcp if backend == "mcp" else invoke_codex_cli
+
+        stdout, stderr = await invoker(
             f"{format_instruction}\n\n{delimiter_instruction}\n\n{codex_prompt}",
             working_directory,
             execution_mode,

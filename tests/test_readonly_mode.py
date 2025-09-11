@@ -25,7 +25,7 @@ class TestReadOnlyMode(unittest.IsolatedAsyncioTestCase):
         if "CODEX_ALLOW_WRITE" in os.environ:
             del os.environ["CODEX_ALLOW_WRITE"]
 
-    @patch.dict(os.environ, {"CODEX_ALLOW_WRITE": "false"})
+    @patch.dict(os.environ, {"CODEX_ALLOW_WRITE": "false", "CODEX_BACKEND": "cli"})
     @patch("claude_codex_bridge.bridge_server.invoke_codex_cli")
     @patch("claude_codex_bridge.bridge_server.dde.validate_working_directory")
     @patch("claude_codex_bridge.bridge_server.dde.should_delegate")
@@ -60,7 +60,7 @@ class TestReadOnlyMode(unittest.IsolatedAsyncioTestCase):
         call_args = mock_invoke_codex.call_args[0]
         self.assertEqual(call_args[3], "read-only")  # sandbox_mode parameter
 
-    @patch.dict(os.environ, {"CODEX_ALLOW_WRITE": "true"})
+    @patch.dict(os.environ, {"CODEX_ALLOW_WRITE": "true", "CODEX_BACKEND": "cli"})
     @patch("claude_codex_bridge.bridge_server.invoke_codex_cli")
     @patch("claude_codex_bridge.bridge_server.dde.validate_working_directory")
     @patch("claude_codex_bridge.bridge_server.dde.should_delegate")
@@ -94,7 +94,7 @@ class TestReadOnlyMode(unittest.IsolatedAsyncioTestCase):
         call_args = mock_invoke_codex.call_args[0]
         self.assertEqual(call_args[3], "workspace-write")  # sandbox_mode parameter
 
-    @patch.dict(os.environ, {"CODEX_ALLOW_WRITE": "false"})
+    @patch.dict(os.environ, {"CODEX_ALLOW_WRITE": "false", "CODEX_BACKEND": "cli"})
     @patch("claude_codex_bridge.bridge_server.invoke_codex_cli")
     @patch("claude_codex_bridge.bridge_server.dde.validate_working_directory")
     @patch("claude_codex_bridge.bridge_server.dde.should_delegate")

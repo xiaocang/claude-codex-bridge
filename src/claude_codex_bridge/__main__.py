@@ -27,14 +27,27 @@ def main() -> None:
 
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
 
+    parser.add_argument(
+        "--legacy-cmd",
+        action="store_true",
+        help=(
+            "Use legacy Codex CLI backend (codex exec). "
+            "By default the bridge uses the Codex MCP backend."
+        ),
+    )
     args = parser.parse_args()
 
-    # Set environment variable for the server to use
+    # Set environment variables for the server to use
     os.environ["CODEX_ALLOW_WRITE"] = "true" if args.allow_write else "false"
+    os.environ["CODEX_BACKEND"] = "cli" if args.legacy_cmd else "mcp"
 
     # Display startup information
     mode = "READ-WRITE" if args.allow_write else "READ-ONLY (Planning & Analysis)"
-    print(f"🧠 Starting Claude-Codex Bridge in {mode} mode", file=sys.stderr)
+    backend = "legacy CLI (codex exec)" if args.legacy_cmd else "MCP"
+    print(
+        f"🧠 Starting Claude-Codex Bridge in {mode} mode using {backend} backend",
+        file=sys.stderr,
+    )
 
     if not args.allow_write:
         print(

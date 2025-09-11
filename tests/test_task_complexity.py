@@ -36,20 +36,21 @@ class TestTaskComplexity(unittest.IsolatedAsyncioTestCase):
             captured_args["cmd"] = list(cmd)
             return DummyProcess(returncode=0, stdout=b"done", stderr=b"")
 
-        with patch.object(
-            asyncio, "create_subprocess_exec", side_effect=fake_subprocess_exec
-        ):
-            os.environ["CODEX_ALLOW_WRITE"] = "false"
+        with patch.dict(os.environ, {"CODEX_BACKEND": "cli"}):
+            with patch.object(
+                asyncio, "create_subprocess_exec", side_effect=fake_subprocess_exec
+            ):
+                os.environ["CODEX_ALLOW_WRITE"] = "false"
 
-            with tempfile.TemporaryDirectory() as tmpdir:
-                await codex_delegate(
-                    task_description="Analyze code",
-                    working_directory=tmpdir,
-                    execution_mode="on-failure",
-                    sandbox_mode="read-only",
-                    output_format="diff",
-                    task_complexity="high",
-                )
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    await codex_delegate(
+                        task_description="Analyze code",
+                        working_directory=tmpdir,
+                        execution_mode="on-failure",
+                        sandbox_mode="read-only",
+                        output_format="diff",
+                        task_complexity="high",
+                    )
 
         cmd = captured_args["cmd"]
         pair_found = any(

@@ -41,6 +41,11 @@ make build                       # Alternative using Makefile
 make clean                       # Clean build artifacts
 ```
 
+### Backend Selection
+- Default Codex backend: MCP
+- Force legacy CLI backend: add `--legacy-cmd` to the bridge invocation
+
+
 ### Environment Configuration
 Create a `.env` file in the project root to configure optional settings. No cache-specific variables are required.
 

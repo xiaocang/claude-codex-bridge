@@ -153,6 +153,8 @@ uv run python -m claude_codex_bridge --allow-write
 
 #### Command-Line Options
 - `--allow-write`: Enable file modification operations (default: read-only)
+- `--legacy-cmd`: Use legacy Codex CLI backend (`codex exec`). By default the bridge
+  uses the Codex MCP backend.
 - `--verbose`: Enable verbose output for debugging
 
 ### Claude Code Integration
