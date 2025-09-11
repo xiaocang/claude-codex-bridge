@@ -45,9 +45,11 @@ make clean                       # Clean build artifacts
 - Default Codex backend: MCP
 - Force legacy CLI backend: add `--legacy-cmd` to the bridge invocation
 
-
 ### Environment Configuration
-Create a `.env` file in the project root to configure optional settings. No cache-specific variables are required.
+Create a `.env` file in the project root to configure optional settings:
+- `CODEX_ALLOW_WRITE=true`: Enable file write operations (default: false for safety)
+- `CODEX_BACKEND=mcp|cli`: Select backend type (default: mcp)
+- `CODEX_CMD=codex`: Override Codex command path (default: "codex")
 
 ## Architecture Overview
 
@@ -83,20 +85,24 @@ Delegates coding tasks to OpenAI Codex CLI with intelligent prompt optimization.
 - `working_directory`: Absolute path to project directory
 
 **Optional Parameters:**
-- `execution_mode`: `untrusted`, `on-failure` (default), `on-request`, `never`
-- `sandbox_mode`: `read-only`, `workspace-write` (default), `danger-full-access`
-- `output_format`: `diff` (default), `full_file`, `explanation`
+- `approval_policy`: `untrusted`, `on-failure` (default), `on-request`, `never`
+- `sandbox_mode`: `read-only` (default), `workspace-write`, `danger-full-access`
+- `output_format`: `explanation` (default), `diff`, `full_file`
+- `task_complexity`: `minimal`, `low`, `medium` (default), `high`
+- `max_output_tokens`: Maximum tokens for response (default: 100000)
+- `web_search`: Enable web search tool (default: false)
 
 **Example Usage:**
 ```python
 await codex_delegate(
     task_description="Add email validation method to User class",
     working_directory="/Users/username/my-project",
-    execution_mode="on-failure",
-    sandbox_mode="workspace-write"
+    approval_policy="on-failure",
+    sandbox_mode="workspace-write",
+    task_complexity="medium"
 )
 ```
- 
+
 
 ### MCP Resources
 - `bridge://docs/usage`: Detailed usage guide
@@ -123,41 +129,73 @@ The project uses pytest with comprehensive unit tests covering:
 - LRU eviction under size constraints
 - Statistics and cleanup operations
 
+**Additional Tests:**
+- **Bridge Server Tests (`tests/test_bridge_server.py`)**: Async MCP server functionality
+- **Invocation Tests**: Parameter handling and CLI/MCP backend selection
+- **Delimiter Tests**: Output parsing with various delimiter configurations
+- **Security Tests**: Directory validation and sandbox mode enforcement
+
 **Test Execution Patterns:**
 - Uses `tempfile.TemporaryDirectory()` for isolated file system tests
 - Tests both success and failure scenarios
-- Validates security constraints
+- Validates security constraints and parameter edge cases
+- Mocks subprocess execution for timeout and error scenarios
 
 ## Development Workflow
 
 ### Code Organization
-- `src/claude_codex_bridge/`: Main source code with clean separation of concerns
-- `tests/`: Unit tests mirroring source structure
-- Configuration via environment variables with sensible defaults
-- Error handling with graceful degradation
+- `src/claude_codex_bridge/bridge_server.py`: Main MCP server with FastMCP integration
+- `src/claude_codex_bridge/engine.py`: Delegation Decision Engine for task analysis
+- `tests/`: Comprehensive test suite covering engine, server, and edge cases
+- Configuration via environment variables with secure defaults
+- Error handling with graceful degradation and structured responses
 
 ### Key Implementation Details
-- Uses async/await throughout for non-blocking I/O operations
-- Implements proper subprocess management with timeout handling
-- Chinese comments in some files indicate international development context
-- Follows Python best practices with type hints and comprehensive error handling
-- Package is published to PyPI as `claude-codex-bridge`
+- **Dual Backend Support**: MCP (default) and CLI backends for Codex integration
+- **Security-First Design**: Read-only mode by default, explicit write enablement required
+- **Async Architecture**: Uses async/await throughout for non-blocking I/O operations
+- **Robust Output Parsing**: Wrapper-style delimiter extraction with fallback support
+- **Directory Security**: Path validation prevents access to system directories
+- **Package Distribution**: Published to PyPI as `claude-codex-bridge`
 
-### Working with Codex CLI Integration
-- Requires OpenAI Codex CLI to be installed: `npm install -g @openai/codex`
-- Uses subprocess execution with proper working directory isolation
-- Supports multiple execution and sandbox modes for different security requirements
-- Provides structured JSON output parsing with automatic content type detection
+### Backend Integration Patterns
+**MCP Backend (Default):**
+- Uses `codex mcp` subprocess with stdio client
+- Process-level configuration via CLI flags
+- Tool discovery and dynamic invocation
+- Structured content extraction from MCP responses
+
+**CLI Backend (Legacy):**
+- Direct `codex exec` subprocess invocation
+- Command-line parameter configuration
+- stdout/stderr capture and parsing
+- Backward compatibility with existing workflows
 
 ## Security Considerations
 
-**Working Directory Validation**: Prevents access to system directories (`/etc`, `/usr/bin`, `/bin`, `/sbin`, `/root`)
+**Working Directory Validation**:
+- Prevents access to system directories (`/etc`, `/usr/bin`, `/bin`, `/sbin`, `/root`)
+- Requires absolute paths and validates directory existence
+- Uses `os.path.realpath()` to resolve symlinks before validation
 
-**Sandbox Modes**: 
-- `read-only`: Safe for code analysis
-- `workspace-write`: Recommended for development
-- `danger-full-access`: Use with extreme caution
+**Sandbox Modes**:
+- `read-only`: Safe for code analysis and planning (default)
+- `workspace-write`: Recommended for development (requires `--allow-write`)
+- `danger-full-access`: Full system access (use with extreme caution)
 
-**Path Security**: Always use absolute paths, validate directory existence and permissions
+**Environment-Based Controls**:
+- `CODEX_ALLOW_WRITE=true`: Required to enable file write operations
+- Server defaults to read-only mode for safety unless explicitly overridden
 
-- write code, comments, and string constants in English, always
+**Process Isolation**:
+- Codex CLI/MCP runs in isolated subprocess with proper working directory
+- 1-hour timeout protection against runaway processes
+- Structured error handling for process failures
+
+## Development Guidelines
+
+- Write code, comments, and string constants in English
+- Use absolute paths for all directory operations
+- Validate all user inputs and environment configurations
+- Test both success and failure scenarios thoroughly
+- Follow async/await patterns for I/O operations

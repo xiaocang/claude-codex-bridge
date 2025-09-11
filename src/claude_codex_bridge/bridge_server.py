@@ -999,7 +999,7 @@ codex_delegate(
 - `workspace-write`: Writable workspace (only available with --allow-write)
 - `danger-full-access`: Full system access (dangerous, requires --allow-write)
 
-**output_format** (optional, default: "diff")
+**output_format** (optional, default: "explanation")
 - `explanation`: Natural language analysis and recommendations (best for planning)
 - `diff`: Changes in patch format (useful for implementation)
 - `full_file`: Complete modified file content
