@@ -22,23 +22,6 @@ Claude-Codex Bridge embraces a **planning-first approach** to software developme
 3. **Learning Tool**: Understand the "why" behind recommendations, not just the "what"
 4. **Audit Trail**: Clear separation between planning and execution phases
 
-### Recommended Development Flow
-
-```mermaid
-graph LR
-    A[🔍 Analyze] --> B[🧠 Understand]
-    B --> C[📋 Plan]
-    C --> D[👁️ Review]
-    D --> E[⚡ Execute With Claude Code]
-    E --> F[✅ Validate]
-```
-
-1. **Analyze**: Use read-only mode to deeply understand your codebase
-2. **Understand**: Let Codex explain complex relationships and patterns
-3. **Plan**: Design comprehensive solutions and strategies
-4. **Review**: Examine Codex's recommendations carefully
-5. **Execute**: Enable write mode and apply changes thoughtfully using Claude Code
-6. **Validate**: Test and verify the implemented changes
 
 ## Project Overview
 
@@ -82,35 +65,6 @@ graph TD
 pip install claude-codex-bridge
 ```
 
-#### From Source
-
-1. **uv Package Manager** (if building from source): `curl -LsSf https://astral.sh/uv/install.sh | sh`
-
-2. **Clone the project**
-   ```bash
-   git clone https://github.com/xiaocang/claude-codex-bridge.git
-   cd claude-codex-bridge
-   ```
-
-3. **Install dependencies**
-   ```bash
-   uv sync
-   ```
-
-   Or with pip:
-   ```bash
-   pip install -e .
-   ```
-
-4. **Configure environment variables** (optional)
-   ```bash
-   # Copy environment variable template
-   cp .env.example .env
-
-   # Edit .env file, add API keys
-   vim .env
-   ```
-
 ### Starting the Server
 
 The server supports two operational modes:
@@ -118,37 +72,17 @@ The server supports two operational modes:
 #### 📋 Planning Mode (Default - Recommended)
 Start in read-only mode for safe code analysis and planning:
 
-**If installed from PyPI:**
-```bash
-claude-codex-bridge
-```
-
-**Or using Python module:**
+**Using Python module:**
 ```bash
 python -m claude_codex_bridge
-```
-
-**If running from source:**
-```bash
-uv run python -m claude_codex_bridge
 ```
 
 #### ⚡ Execution Mode (When Ready to Apply Changes)
 Enable write operations when you're ready to implement Codex's recommendations:
 
-**If installed from PyPI:**
-```bash
-claude-codex-bridge --allow-write
-```
-
-**Or using Python module:**
+**Using Python module:**
 ```bash
 python -m claude_codex_bridge --allow-write
-```
-
-**If running from source:**
-```bash
-uv run python -m claude_codex_bridge --allow-write
 ```
 
 #### Command-Line Options
@@ -179,18 +113,6 @@ claude mcp add codex-execution --command "claude-codex-bridge --allow-write" --s
 # Copy the example configuration
 cp .mcp.json.example .mcp.json
 # Edit to match your setup
-```
-
-#### 2. Usage Examples
-
-**Planning Phase (Read-Only):**
-```
-/mcp__codex-planning__codex_delegate "Analyze the authentication system for security vulnerabilities" --working_directory "/path/to/your/project" --task_complexity high
-```
-
-**Execution Phase (Write-Enabled):**
-```
-/mcp__codex-execution__codex_delegate "Implement the security fixes we planned earlier" --working_directory "/path/to/your/project" --task_complexity high
 ```
 
 ## Main Tools
@@ -239,40 +161,6 @@ Leverage Codex's advanced analytical capabilities for code comprehension and str
 }
 ```
  
-
-## Configuration Options
-
-### Environment Variables
-
-No environment variables are required for configuration.
-
-### Execution Mode Explanation
-
-- **untrusted**: Only runs trusted commands, most secure
-- **on-failure**: Requests approval on failure, recommended for most tasks
-- **on-request**: Model decides when to request approval, suitable for complex tasks
-- **never**: Never requests approval, suitable for simple automation tasks
-
-### Sandbox Mode Explanation
-
-- **read-only**: Read-only access, suitable for code analysis and explanation
-- **workspace-write**: Writable workspace, suitable for most development tasks
-- **danger-full-access**: Full access, use with caution
-
-### Wrapper Output Delimiters
-
-By default, the bridge asks the model to wrap its final deliverable content between wrapper delimiters and then extracts only the wrapped section:
-
-- Default start/end: `--[=[` and `]=]--` (Lua-style long bracket form)
-- Customize via tool parameters: set `final_output_start_delimiter` and `final_output_end_delimiter` on `codex_delegate`
-- Strict mode: set `final_output_strict=true` to error when delimiters are missing
-
-Important: When referencing these delimiters in the instruction text (the prompt that describes how to format output), escape square brackets so they are not mistaken as the actual wrapper. For example:
-
-- Show as `--\[=\[` and `\]=]--` in the instruction
-- Then clarify that `\[`/`\]` are escapes only; the actual output should use unescaped delimiters
-
-The server already applies this escaping in its own instructions to avoid premature parsing when models echo guidance.
 
 ## Version History
 
