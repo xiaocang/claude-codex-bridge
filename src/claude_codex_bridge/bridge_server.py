@@ -145,10 +145,12 @@ async def invoke_codex_cli(
     # Configure model reasoning effort, max output tokens, and tools
     command.extend(["-c", f'model_reasoning_effort="{task_complexity}"'])
     command.extend(["-c", f"model_max_output_tokens={model_max_output_tokens}"])
-    command.extend([
-        "-c",
-        f"tools.web_search={'true' if tools_web_search else 'false'}",
-    ])
+    command.extend(
+        [
+            "-c",
+            f"tools.web_search={'true' if tools_web_search else 'false'}",
+        ]
+    )
 
     # Add delimiter to ensure any leading dashes in prompt
     # are treated as positional text, not CLI flags
@@ -258,10 +260,12 @@ async def invoke_codex_mcp(
 
     # Configure max output tokens and web search tool
     args.extend(["-c", f"model_max_output_tokens={model_max_output_tokens}"])
-    args.extend([
-        "-c",
-        f"tools.web_search={'true' if tools_web_search else 'false'}",
-    ])
+    args.extend(
+        [
+            "-c",
+            f"tools.web_search={'true' if tools_web_search else 'false'}",
+        ]
+    )
 
     # Construct stdio server parameters
     server = StdioServerParameters(
@@ -661,7 +665,7 @@ async def codex_delegate(
     sandbox_mode: Literal[
         "read-only", "workspace-write", "danger-full-access"
     ] = "read-only",
-    output_format: Literal["diff", "full_file", "explanation"] = "explanation",
+    output_format: Literal["explanation", "diff", "full_file"] = "explanation",
     task_complexity: Literal["minimal", "low", "medium", "high"] = "medium",
     final_output_start_delimiter: Optional[str] = None,
     final_output_end_delimiter: Optional[str] = None,
@@ -670,47 +674,47 @@ async def codex_delegate(
     web_search: bool = False,
 ) -> str:
     """Leverage Codex's advanced analytical capabilities for
-code comprehension and planning.
+    code comprehension and planning.
 
-Codex excels at reading and analyzing specific code files by filename
-and specializes in:
-• Precise file analysis when given explicit file paths
-  (e.g., src/auth.py, tests/test_auth.py)
-• Designing architectural solutions and refactoring strategies
-• Planning implementation approaches and generating test strategies
-• Reviewing code for quality, security, and performance issues
-• Change impact mapping across codebases
+    Codex excels at reading and analyzing specific code files by filename
+    and specializes in:
+    • Precise file analysis when given explicit file paths
+      (e.g., src/auth.py, tests/test_auth.py)
+    • Designing architectural solutions and refactoring strategies
+    • Planning implementation approaches and generating test strategies
+    • Reviewing code for quality, security, and performance issues
+    • Change impact mapping across codebases
 
-Evaluate each task's difficulty and set `task_complexity` to "minimal", "low",
-"medium", or "high" so Codex can allocate appropriate reasoning effort.
+    Evaluate each task's difficulty and set `task_complexity` to "minimal", "low",
+    "medium", or "high" so Codex can allocate appropriate reasoning effort.
 
-Note: Codex operates in read-only mode by default and produces analyses,
-plans, and proposed diffs.
-It never directly modifies source code - changes should be applied via
-Claude Code's editing tools.
+    Note: Codex operates in read-only mode by default and produces analyses,
+    plans, and proposed diffs.
+    It never directly modifies source code - changes should be applied via
+    Claude Code's editing tools.
 
-Args:
-    task_description: Describe what you want Codex to analyze or plan
-    working_directory: Project directory to analyze
-    request_id: Optional request identifier for client-side request tracking
-    approval_policy: Approval strategy (default: on-failure)
+    Args:
+        task_description: Describe what you want Codex to analyze or plan
+        working_directory: Project directory to analyze
+        request_id: Optional request identifier for client-side request tracking
+        approval_policy: Approval strategy (default: on-failure)
 
-    output_format: How to format the analysis results; the bridge also
-        injects a format-specific instruction into the prompt so the model
-        returns only the requested format inside the delimiters
-    task_complexity: Guidance for Codex's reasoning effort (default: "medium")
-    max_output_tokens: Maximum tokens Codex may generate in a single response
-        (default: 100000)
-    final_output_start_delimiter: Start delimiter for output extraction
-        (default: "--[=[")
-    final_output_end_delimiter: End delimiter for output extraction
-        (default: "]=]--")
-    final_output_strict: Enable strict delimiter enforcement (default: False)
-    sandbox_mode: File access mode (forced to read-only unless --allow-write)
-    web_search: Enable Codex web search tool integration (default: False)
+        output_format: How to format the analysis results; the bridge also
+            injects a format-specific instruction into the prompt so the model
+            returns only the requested format inside the delimiters
+        task_complexity: Guidance for Codex's reasoning effort (default: "medium")
+        max_output_tokens: Maximum tokens Codex may generate in a single response
+            (default: 100000)
+        final_output_start_delimiter: Start delimiter for output extraction
+            (default: "--[=[")
+        final_output_end_delimiter: End delimiter for output extraction
+            (default: "]=]--")
+        final_output_strict: Enable strict delimiter enforcement (default: False)
+        sandbox_mode: File access mode (forced to read-only unless --allow-write)
+        web_search: Enable Codex web search tool integration (default: False)
 
-Returns:
-    Detailed analysis, recommendations, or implementation plan"""
+    Returns:
+        Detailed analysis, recommendations, or implementation plan"""
 
     # 1. Enforce read-only mode if write is not allowed (do this first)
     effective_sandbox_mode = sandbox_mode
