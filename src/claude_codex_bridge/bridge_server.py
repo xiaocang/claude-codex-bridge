@@ -6,6 +6,7 @@ between Claude and OpenAI Codex CLI.
 """
 
 import asyncio
+import logging
 import json
 import os
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
@@ -41,6 +42,9 @@ when you're ready to apply Codex's recommendations.""",
 
 # Initialize Delegation Decision Engine
 dde = DelegationDecisionEngine()
+
+# Module logger
+logger = logging.getLogger(__name__)
 
 # Backward-compatible single-line delimiter; can be overridden via env var
 # Default mirrors historical behavior used by older tests/clients
@@ -342,19 +346,40 @@ async def invoke_codex_mcp(
                 # Extract text content
                 texts: List[str] = []
                 for item in result.content or []:
-                    # item is a pydantic model (e.g., TextContent)
-                    try:
-                        if isinstance(item, mcp_types.TextContent):
-                            texts.append(item.text)
-                        else:
-                            # Attempt to coerce to string if other content types
-                            as_dict = (
-                                item.model_dump() if hasattr(item, "model_dump") else {}
-                            )
-                            if isinstance(as_dict, dict) and "text" in as_dict:
-                                texts.append(str(as_dict["text"]))
-                    except Exception:
+                    # Prefer explicit content type
+                    if isinstance(item, mcp_types.TextContent):
+                        texts.append(item.text)
                         continue
+
+                    # Attempt to coerce other content types to text safely
+                    as_dict: Dict[str, Any] = {}
+
+                    model_dump = getattr(item, "model_dump", None)
+                    if callable(model_dump):
+                        try:
+                            dumped = model_dump()
+                            if isinstance(dumped, dict):
+                                as_dict = dumped
+                        except Exception as exc:  # noqa: BLE001
+                            # Log and proceed without halting the whole operation
+                            logger.debug(
+                                "Failed to model_dump MCP content item %r: %s",
+                                item,
+                                exc,
+                            )
+
+                    if isinstance(as_dict, dict):
+                        text_value = as_dict.get("text")
+                        if text_value is not None:
+                            try:
+                                texts.append(str(text_value))
+                            except Exception as exc:  # noqa: BLE001
+                                logger.debug(
+                                    "Failed to convert text field to str for "
+                                    "item %r: %s",
+                                    item,
+                                    exc,
+                                )
 
                 stdout_text = "\n".join([t for t in texts if t])
                 return stdout_text, ""
