@@ -363,7 +363,7 @@ async def invoke_codex_mcp(
             "codex command not found. Please ensure OpenAI Codex CLI is installed: "
             "npm install -g @openai/codex"
         )
-    except TimeoutError:
+    except asyncio.TimeoutError:
         raise asyncio.TimeoutError(
             f"Codex MCP execution timed out (exceeded {timeout} seconds)"
         )
