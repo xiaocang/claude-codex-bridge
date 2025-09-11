@@ -3,7 +3,6 @@
 __version__ = "0.1.2"
 __author__ = "xiaocang"
 
-from .cache import ResultCache
 from .engine import DelegationDecisionEngine
 
-__all__ = ["ResultCache", "DelegationDecisionEngine", "__version__"]
+__all__ = ["DelegationDecisionEngine", "__version__"]

@@ -6,8 +6,8 @@ between Claude and OpenAI Codex CLI.
 """
 
 import asyncio
-import logging
 import json
+import logging
 import os
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
@@ -19,10 +19,15 @@ except ImportError:
     # When running directly, use absolute imports
     from engine import DelegationDecisionEngine  # type: ignore[no-redef]
 
-# Initialize FastMCP instance
-mcp = FastMCP(
-    name="claude-codex-bridge",
-    instructions="""An intelligent MCP server that leverages Codex's exceptional
+
+def _get_dynamic_instructions() -> str:
+    """
+    Generate dynamic instructions based on whether write operations are allowed.
+    Only includes sandbox mode information when --allow-write is enabled.
+    """
+    allow_write = os.environ.get("CODEX_ALLOW_WRITE", "false").lower() == "true"
+
+    base_instructions = """An intelligent MCP server that leverages Codex's exceptional
 capabilities in code analysis, architectural planning, and complex problem-solving.
 
 Codex excels at:
@@ -34,10 +39,26 @@ Codex excels at:
 
 Callers should assess each task's difficulty and set the
 `task_complexity` parameter ("low", "medium", or "high") accordingly to
-guide Codex's reasoning effort.
+guide Codex's reasoning effort."""
+
+    if allow_write:
+        # Only when write is enabled, include sandbox mode information
+        return (
+            base_instructions
+            + """
 
 By default, operates in read-only mode for safety. Enable write mode with --allow-write
-when you're ready to apply Codex's recommendations.""",
+when you're ready to apply Codex's recommendations."""
+        )
+    else:
+        # When write is disabled, no mention of modes at all
+        return base_instructions
+
+
+# Initialize FastMCP instance
+mcp = FastMCP(
+    name="claude-codex-bridge",
+    instructions=_get_dynamic_instructions(),
 )
 
 # Initialize Delegation Decision Engine
@@ -190,10 +211,11 @@ async def invoke_codex_mcp(
     It returns concatenated text content from the tool result.
     """
     # Deferred imports to avoid hard dependency on client at import time
-    from mcp.client.stdio import StdioServerParameters, stdio_client
-    from mcp.client.session import ClientSession
-    import mcp.types as mcp_types
     from datetime import timedelta
+
+    import mcp.types as mcp_types
+    from mcp.client.session import ClientSession
+    from mcp.client.stdio import StdioServerParameters, stdio_client
 
     # Build server command
     command = os.environ.get("CODEX_CMD", "codex")
@@ -566,6 +588,63 @@ def parse_codex_output(
     }
 
 
+def _get_tool_description() -> str:
+    """Generate dynamic tool description based on write permissions."""
+    allow_write = os.environ.get("CODEX_ALLOW_WRITE", "false").lower() == "true"
+
+    base_description = """Leverage Codex's advanced analytical capabilities for
+code comprehension and planning.
+
+Codex excels at reading and analyzing specific code files by filename
+and specializes in:
+• Precise file analysis when given explicit file paths
+  (e.g., src/auth.py, tests/test_auth.py)
+• Designing architectural solutions and refactoring strategies
+• Planning implementation approaches and generating test strategies
+• Reviewing code for quality, security, and performance issues
+• Change impact mapping across codebases
+
+Evaluate each task's difficulty and set `task_complexity` to "low",
+"medium", or "high" so Codex can allocate appropriate reasoning effort.
+
+Note: Codex operates in read-only mode by default and produces analyses,
+plans, and proposed diffs.
+It never directly modifies source code - changes should be applied via
+Claude Code's editing tools.
+
+Args:
+    task_description: Describe what you want Codex to analyze or plan
+    working_directory: Project directory to analyze
+    execution_mode: Approval strategy (default: on-failure)"""
+
+    # Common parameters always shown
+    common_args = """
+    output_format: How to format the analysis results; the bridge also
+        injects a format-specific instruction into the prompt so the model
+        returns only the requested format inside the delimiters
+    task_complexity: Guidance for Codex's reasoning effort (default: "medium")
+    final_output_start_delimiter: Start delimiter for output extraction
+        (default: "--[=[")
+    final_output_end_delimiter: End delimiter for output extraction
+        (default: "]=]--")
+    final_output_strict: Enable strict delimiter enforcement (default: False)
+
+Returns:
+    Detailed analysis, recommendations, or implementation plan"""
+
+    if allow_write:
+        # Include sandbox_mode parameter documentation when write is enabled
+        return (
+            base_description
+            + """
+    sandbox_mode: File access mode (forced to read-only unless --allow-write)"""
+            + common_args
+        )
+    else:
+        # Omit sandbox_mode from documentation when write is disabled
+        return base_description + common_args
+
+
 @mcp.tool()
 async def codex_delegate(
     task_description: str,
@@ -582,45 +661,8 @@ async def codex_delegate(
     final_output_end_delimiter: Optional[str] = None,
     final_output_strict: Optional[bool] = None,
 ) -> str:
-    """
-    Leverage Codex's advanced analytical capabilities for code comprehension and
-    planning.
-
-    Codex excels at reading and analyzing specific code files by filename
-    and specializes in:
-    • Precise file analysis when given explicit file paths
-      (e.g., src/auth.py, tests/test_auth.py)
-    • Designing architectural solutions and refactoring strategies
-    • Planning implementation approaches and generating test strategies
-    • Reviewing code for quality, security, and performance issues
-    • Change impact mapping across codebases
-
-    Evaluate each task's difficulty and set `task_complexity` to "low",
-    "medium", or "high" so Codex can allocate appropriate reasoning effort.
-
-    Note: Codex operates in read-only mode by default and produces analyses,
-    plans, and proposed diffs.
-    It never directly modifies source code - changes should be applied via
-    Claude Code's editing tools.
-
-    Args:
-        task_description: Describe what you want Codex to analyze or plan
-        working_directory: Project directory to analyze
-        execution_mode: Approval strategy (default: on-failure)
-        sandbox_mode: File access mode (forced to read-only unless --allow-write)
-        output_format: How to format the analysis results; the bridge also
-            injects a format-specific instruction into the prompt so the model
-            returns only the requested format inside the delimiters
-        task_complexity: Guidance for Codex's reasoning effort (default: "medium")
-        final_output_start_delimiter: Start delimiter for output extraction
-            (default: "--[=[")
-        final_output_end_delimiter: End delimiter for output extraction
-            (default: "]=]--")
-        final_output_strict: Enable strict delimiter enforcement (default: False)
-
-    Returns:
-        Detailed analysis, recommendations, or implementation plan
-    """
+    # Set dynamic tool description at runtime
+    codex_delegate.__doc__ = _get_tool_description()
     # 1. Enforce read-only mode if write is not allowed (do this first)
     effective_sandbox_mode = sandbox_mode
     mode_notice: Optional[Dict[str, Union[str, List[str]]]] = None
