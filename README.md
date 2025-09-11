@@ -164,6 +164,20 @@ Leverage Codex's advanced analytical capabilities for code comprehension and str
 
 ## Version History
 
+### v0.1.3
+- 🔄 **Default Codex MCP Backend**: Switch from CLI to MCP backend by default with `--legacy-cmd` fallback option
+- 🛡️ **Enhanced Security**: Read-only sandbox mode as default, explicit `--allow-write` required for file modifications
+- 🎯 **Robust Output Extraction**: New wrapper-style delimiter system with configurable start/end delimiters and strict mode support
+- ⚙️ **New CLI Options**: Added `--legacy-cmd` flag for backward compatibility with CLI backend
+- 🔧 **Extended Tool Parameters**: New `final_output_start_delimiter`, `final_output_end_delimiter`, `final_output_strict`, and `request_id` parameters for enhanced control
+- 📊 **Dynamic Tool Descriptions**: Tool descriptions now adapt to current write permissions for precise guidance
+- 🎨 **Format-Specific Prompts**: Automatic injection of format-specific prompt preambles for better model responses
+- 🔒 **Enforced Security Defaults**: Operation mode notices when overriding to planning mode (read-only)
+- 🛠️ **Improved Content Detection**: Better content-type detection applied after wrapper extraction
+- 🧹 **Architecture Cleanup**: Complete removal of cache subsystem for simplified, more reliable operation
+- ⚠️ **Breaking Changes**: Default sandbox mode changed from `workspace-write` to `read-only`, cache-related tools and response fields removed
+- ❌ **Removals**: Cache subsystem, cache tests, cache environment variables, and cache-related MCP tools completely removed
+
 ### v0.1.2
 - 🆕 Support specifying task complexity when invoking Codex
 - ⏱️ Increase default timeout to 1 hour for Codex CLI operations
