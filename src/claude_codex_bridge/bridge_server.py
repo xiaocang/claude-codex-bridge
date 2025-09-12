@@ -378,10 +378,7 @@ async def invoke_codex_mcp(
     async def _logging_callback(
         params: "mcp_types.LoggingMessageNotificationParams",
     ) -> None:  # type: ignore[name-defined]
-        try:
-            logger.debug("[codex-mcp][%s] %s", params.level, params.data)
-        except Exception:  # noqa: BLE001
-            pass
+        logger.debug("[codex-mcp][%s] %s", params.level, params.data)
 
     try:
         async with stdio_client(server) as (read_stream, write_stream):
