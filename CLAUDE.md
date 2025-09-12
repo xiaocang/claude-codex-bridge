@@ -108,10 +108,6 @@ await codex_delegate(
 - `bridge://docs/usage`: Detailed usage guide
 - `bridge://docs/best_practices`: Best practices for task descriptions
 
-### MCP Prompt Templates
-- `refactor_code(file_path, refactor_type)`: Generates refactoring prompts
-- `generate_tests(file_path, test_framework)`: Generates test creation prompts
-
 ## Testing Strategy
 
 The project uses pytest with comprehensive unit tests covering:
