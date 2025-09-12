@@ -131,7 +131,7 @@ Leverage Codex's advanced analytical capabilities for code comprehension and str
 **Parameters**:
 - `task_description` (required): Describe what you want Codex to analyze or plan
 - `working_directory` (required): Project directory to analyze
-- `execution_mode` (optional): Approval strategy (default: on-failure)
+- `approval_policy` (optional): Approval strategy (untrusted, on-failure [default], on-request, never)
 - `sandbox_mode` (optional): File access mode (forced to read-only unless --allow-write)
 - `output_format` (optional): How to format the analysis results (diff/full_file/explanation)
 - `task_complexity` (optional): Model reasoning effort (low/medium/high)
@@ -142,7 +142,7 @@ Leverage Codex's advanced analytical capabilities for code comprehension and str
 {
   "task_description": "Analyze the user authentication system for security vulnerabilities and design improvement strategies",
   "working_directory": "/Users/username/my-project",
-  "execution_mode": "on-failure",
+  "approval_policy": "on-failure",
   "sandbox_mode": "read-only",
   "output_format": "explanation",
   "task_complexity": "medium"
@@ -154,7 +154,7 @@ Leverage Codex's advanced analytical capabilities for code comprehension and str
 {
   "task_description": "Implement the security improvements we planned for the authentication system",
   "working_directory": "/Users/username/my-project",
-  "execution_mode": "on-failure",
+  "approval_policy": "on-failure",
   "sandbox_mode": "workspace-write",
   "output_format": "diff",
   "task_complexity": "high"
@@ -163,6 +163,15 @@ Leverage Codex's advanced analytical capabilities for code comprehension and str
  
 
 ## Version History
+
+### v0.1.4
+- 🧩 API Rename: `execution_mode` → `approval_policy` with support for `untrusted`, `on-failure` (default), `on-request`, `never`
+- 🧭 MCP Elicitation Passthrough: Relay interactive prompts upstream when possible; safe auto-decline fallback to prevent hangs
+- 📝 MCP Logging: Add logging callback to capture Codex MCP logs for easier debugging
+- ⏱️ Per-Request Timeouts: Pass `read_timeout_seconds` to tool calls to bound long-running operations
+- 🧷 Read-Only Planning Improvements: Default to `diff` output when write is disabled; prompt includes actionable-diff guidance
+- 🧪 E2E Tests: Add wrapper delimiter and MCP integration scripts
+- 🧹 Cleanup: Remove unused MCP prompt templates
 
 ### v0.1.3
 - 🔄 **Default Codex MCP Backend**: Switch from CLI to MCP backend by default with `--legacy-cmd` fallback option

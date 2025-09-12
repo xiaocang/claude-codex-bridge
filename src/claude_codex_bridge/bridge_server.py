@@ -323,12 +323,74 @@ async def invoke_codex_mcp(
                 return lower_map[key.lower()]
         return None
 
+    # Basic elicitation policy to avoid hangs on interactive prompts.
+    # If the Codex MCP server asks for approval (elicitation/create), we
+    # auto-decline unless the user has explicitly enabled write mode and
+    # chosen a permissive approval policy.
+    async def _elicitation_callback(
+        context: "mcp_types.RequestContext[ClientSession, Any]",  # type: ignore[name-defined]  # noqa: E501
+        params: "mcp_types.ElicitRequestParams",  # type: ignore[name-defined]
+    ) -> "mcp_types.ElicitResult | mcp_types.ErrorData":  # type: ignore[name-defined]  # noqa: E501
+        """
+        Relay elicitation to the upstream MCP client (Claude) when possible.
+
+        If we are running outside an MCP request context (e.g., unit tests),
+        or relaying fails, fall back to a conservative decline to avoid hangs.
+        """
+        try:
+            # Try to obtain the upstream FastMCP request context
+            try:
+                if context is not None:
+                    upstream_ctx = context
+                else:
+                    upstream_ctx = mcp.get_context()
+            except Exception:  # noqa: BLE001
+                upstream_ctx = None
+
+            if upstream_ctx is not None:
+                try:
+                    # Use server-side raw elicitation to pass through arbitrary schemas
+                    result = await upstream_ctx.request_context.session.elicit(
+                        # type: ignore[union-attr]
+                        message=params.message,
+                        requestedSchema=getattr(params, "requestedSchema", {}) or {},
+                        related_request_id=upstream_ctx.request_id,
+                    )
+
+                    # Map server result back to client-side result for Codex MCP
+                    action: Literal["accept", "decline", "cancel"] = getattr(
+                        result, "action", "decline"
+                    )
+                    content = getattr(result, "content", None)
+                    return mcp_types.ElicitResult(action=action, content=content)
+                except Exception as relay_exc:  # noqa: BLE001
+                    logger.debug("Failed to relay elicitation upstream: %s", relay_exc)
+
+            # Fallback policy: decline to prevent indefinite wait
+            return mcp_types.ElicitResult(action="decline")
+        except Exception as exc:  # noqa: BLE001
+            # Fall back to an error if anything goes wrong constructing a response
+            return mcp_types.ErrorData(
+                code=mcp_types.INVALID_REQUEST,
+                message=f"elicitation handling failed: {exc}",
+            )
+
+    async def _logging_callback(
+        params: "mcp_types.LoggingMessageNotificationParams",
+    ) -> None:  # type: ignore[name-defined]
+        try:
+            logger.debug("[codex-mcp][%s] %s", params.level, params.data)
+        except Exception:  # noqa: BLE001
+            pass
+
     try:
         async with stdio_client(server) as (read_stream, write_stream):
             async with ClientSession(
                 read_stream,
                 write_stream,
                 read_timeout_seconds=timedelta(seconds=timeout) if timeout else None,
+                elicitation_callback=_elicitation_callback,
+                logging_callback=_logging_callback,
             ) as session:  # type: ignore[arg-type]
                 # Initialize session
                 await session.initialize()
@@ -367,8 +429,14 @@ async def invoke_codex_mcp(
                 # We only pass the prompt to the selected tool to keep
                 # interactions simple and consistent.
 
-                # Call the tool
-                result = await session.call_tool(tool.name, arguments=args_map)
+                # Call the tool with an explicit request-level timeout
+                result = await session.call_tool(
+                    tool.name,
+                    arguments=args_map,
+                    read_timeout_seconds=(
+                        timedelta(seconds=timeout) if timeout else None
+                    ),
+                )
 
                 if result.isError:
                     raise RuntimeError("Codex MCP tool call returned an error")
@@ -596,64 +664,6 @@ def parse_codex_output(
     }
 
 
-def _get_tool_description() -> str:
-    """Generate dynamic tool description based on write permissions."""
-    allow_write = os.environ.get("CODEX_ALLOW_WRITE", "false").lower() == "true"
-
-    base_description = """Leverage Codex's advanced analytical capabilities for
-code comprehension and planning.
-
-Codex excels at reading and analyzing specific code files by filename
-and specializes in:
-• Precise file analysis when given explicit file paths
-  (e.g., src/auth.py, tests/test_auth.py)
-• Designing architectural solutions and refactoring strategies
-• Planning implementation approaches and generating test strategies
-• Reviewing code for quality, security, and performance issues
-• Change impact mapping across codebases
-
-Evaluate each task's difficulty and set `task_complexity` to "low",
-"medium", or "high" so Codex can allocate appropriate reasoning effort.
-
-Note: Codex operates in read-only mode by default and produces analyses,
-plans, and proposed diffs.
-It never directly modifies source code - changes should be applied via
-Claude Code's editing tools.
-
-Args:
-    task_description: Describe what you want Codex to analyze or plan
-    working_directory: Project directory to analyze
-    request_id: Optional request identifier for client-side request tracking
-    approval_policy: Approval strategy (default: on-failure)"""
-
-    # Common parameters always shown
-    common_args = """
-    output_format: How to format the analysis results; the bridge also
-        injects a format-specific instruction into the prompt so the model
-        returns only the requested format inside the delimiters
-    task_complexity: Guidance for Codex's reasoning effort (default: "medium")
-    final_output_start_delimiter: Start delimiter for output extraction
-        (default: "--[=[")
-    final_output_end_delimiter: End delimiter for output extraction
-        (default: "]=]--")
-    final_output_strict: Enable strict delimiter enforcement (default: False)
-
-Returns:
-    Detailed analysis, recommendations, or implementation plan"""
-
-    if allow_write:
-        # Include sandbox_mode parameter documentation when write is enabled
-        return (
-            base_description
-            + """
-    sandbox_mode: File access mode (forced to read-only unless --allow-write)"""
-            + common_args
-        )
-    else:
-        # Omit sandbox_mode from documentation when write is disabled
-        return base_description + common_args
-
-
 @mcp.tool()
 async def codex_delegate(
     task_description: str,
@@ -718,6 +728,7 @@ async def codex_delegate(
 
     # 1. Enforce read-only mode if write is not allowed (do this first)
     effective_sandbox_mode = sandbox_mode
+    effective_output_format = output_format
     mode_notice: Optional[Dict[str, Union[str, List[str]]]] = None
 
     # Check if write operations are allowed (default: False for safety)
@@ -725,17 +736,22 @@ async def codex_delegate(
 
     if not allow_write and sandbox_mode != "read-only":
         effective_sandbox_mode = "read-only"
+        # Suggest diff format for actionable output when write is disabled
+        if output_format == "explanation":
+            effective_output_format = "diff"
         mode_notice = {
             "mode": "planning",
             "description": "Operating in planning and analysis mode (read-only)",
             "message": (
                 "Codex will analyze your code and provide detailed "
-                "recommendations without modifying files."
+                "recommendations. Output format adjusted to 'diff' for "
+                "actionable results."
             ),
             "hint": "To apply changes, restart the server with --allow-write flag",
             "benefits": [
                 "Safe exploration of solutions",
                 "Comprehensive analysis without risk",
+                "Actionable diffs you can apply manually",
                 "Thoughtful planning before execution",
             ],
         }
@@ -770,6 +786,14 @@ async def codex_delegate(
     codex_prompt = dde.prepare_codex_prompt(task_description)
     optimization_note = None  # Will be used for metacognitive optimization in future
 
+    # Add read-only mode context to prompt when write is disabled
+    if not allow_write and sandbox_mode != "read-only":
+        codex_prompt = (
+            f"Since write operations are disabled, please provide actionable "
+            "recommendations in diff format that can be applied manually.\n\n"
+            f"{codex_prompt}"
+        )
+
     # Resolve delimiter parameters
     start_delimiter = (
         final_output_start_delimiter
@@ -783,13 +807,13 @@ async def codex_delegate(
     )
 
     # Build format-specific instruction and prepend delimiter instruction to prompt
-    if output_format == "diff":
+    if effective_output_format == "diff":
         format_instruction = (
             "Inside the wrapper, output a unified diff only in git patch format "
             "starting with '--- a/' and '+++ b/' headers. Do not include code "
             "fences, comments, or extra text."
         )
-    elif output_format == "full_file":
+    elif effective_output_format == "full_file":
         format_instruction = (
             "Inside the wrapper, output only the complete final file content(s) "
             "without any code fences or commentary. If multiple files, separate "
@@ -836,7 +860,7 @@ async def codex_delegate(
         # 6. Parse output
         result = parse_codex_output(
             stdout,
-            output_format,
+            effective_output_format,
             start_delimiter=start_delimiter,
             end_delimiter=end_delimiter,
             strict=final_output_strict,
