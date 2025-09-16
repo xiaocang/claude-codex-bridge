@@ -351,14 +351,16 @@ async def invoke_codex_mcp(
             request_context = None
             related_request_id: Optional[str] = None
 
-            # Try to obtain the active FastMCP context so we can proxy the
-            # elicitation request back to Claude (or whichever MCP client is
-            # connected upstream).
-            try:
-                upstream_ctx = mcp.get_context()
-            except Exception as ctx_exc:  # noqa: BLE001
-                logger.debug("Unable to fetch upstream MCP context: %s", ctx_exc)
-                upstream_ctx = None
+            # Try to use the provided context first, then fall back to fetching
+            # the active FastMCP context so we can proxy the elicitation request
+            # back to Claude (or whichever MCP client is connected upstream).
+            upstream_ctx = context
+            if upstream_ctx is None:
+                try:
+                    upstream_ctx = mcp.get_context()
+                except Exception as ctx_exc:  # noqa: BLE001
+                    logger.debug("Unable to fetch upstream MCP context: %s", ctx_exc)
+                    upstream_ctx = None
 
             if upstream_ctx is not None:
                 try:
@@ -368,6 +370,23 @@ async def invoke_codex_mcp(
                     logger.debug(
                         "Upstream MCP context missing request context: %s", ctx_exc
                     )
+                    # If the provided context doesn't have request_context,
+                    # try to fetch the FastMCP context
+                    if (
+                        context is not None
+                    ):  # Only try fallback if we were given a context that failed
+                        try:
+                            upstream_ctx = mcp.get_context()
+                            if upstream_ctx is not None:
+                                request_context = upstream_ctx.request_context  # type: ignore[assignment] # noqa: E501
+                                related_request_id = getattr(
+                                    upstream_ctx, "request_id", None
+                                )
+                        except Exception as fallback_exc:  # noqa: BLE001
+                            logger.debug(
+                                "Unable to fetch FastMCP fallback context: %s",
+                                fallback_exc,
+                            )
 
             if request_context is not None:
                 try:
