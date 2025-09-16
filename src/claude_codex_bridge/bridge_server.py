@@ -362,7 +362,7 @@ async def invoke_codex_mcp(
 
             if upstream_ctx is not None:
                 try:
-                    request_context = upstream_ctx.request_context  # type: ignore[assignment]
+                    request_context = upstream_ctx.request_context  # type: ignore[assignment] # noqa: E501
                     related_request_id = getattr(upstream_ctx, "request_id", None)
                 except Exception as ctx_exc:  # noqa: BLE001
                     logger.debug(
