@@ -156,7 +156,7 @@ The project uses pytest with comprehensive unit tests covering:
 
 ### Backend Integration Patterns
 **MCP Backend (Default):**
-- Uses `codex mcp` subprocess with stdio client
+- Uses `codex mcp serve` subprocess with stdio client
 - Process-level configuration via CLI flags
 - Tool discovery and dynamic invocation
 - Structured content extraction from MCP responses
