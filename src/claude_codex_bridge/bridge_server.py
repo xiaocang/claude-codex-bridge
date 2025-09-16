@@ -94,6 +94,7 @@ async def invoke_codex_cli(
     sandbox_mode: str,
     task_complexity: Literal["minimal", "low", "medium", "high"] = "medium",
     allow_write: bool = True,
+    model: Optional[str] = "gpt-5-codex",
     model_max_output_tokens: int = 100000,
     tools_web_search: bool = False,
     timeout: int = 3600,  # 1 hour timeout
@@ -108,6 +109,7 @@ async def invoke_codex_cli(
         sandbox_mode: Codex CLI sandbox strategy mode
         task_complexity: Desired model reasoning effort level (default: "medium")
         allow_write: Whether to allow file write operations
+        model: Codex model identifier to use (default: "gpt-5-codex")
         model_max_output_tokens: Maximum tokens the model can generate (default: 100000)
         tools_web_search: Enable web search tool (default: False)
         timeout: Command timeout in seconds
@@ -144,6 +146,8 @@ async def invoke_codex_cli(
 
     # Configure model reasoning effort, max output tokens, and tools
     command.extend(["-c", f'model_reasoning_effort="{task_complexity}"'])
+    if model:
+        command.extend(["-c", f'model="{model}"'])
     command.extend(["-c", f"model_max_output_tokens={model_max_output_tokens}"])
     command.extend(
         [
@@ -212,6 +216,7 @@ async def invoke_codex_mcp(
     sandbox_mode: str,
     task_complexity: Literal["minimal", "low", "medium", "high"] = "medium",
     allow_write: bool = True,
+    model: Optional[str] = "gpt-5-codex",
     model_max_output_tokens: int = 100000,
     tools_web_search: bool = False,
     timeout: int = 3600,
@@ -219,7 +224,7 @@ async def invoke_codex_mcp(
     """
     Invoke Codex via its MCP server interface using a non-interactive stdio client.
 
-    This function spawns `codex mcp` as a child process, performs the MCP
+    This function spawns `codex mcp serve` as a child process, performs the MCP
     handshake, discovers an appropriate execution tool, and submits the prompt.
     It returns concatenated text content from the tool result.
 
@@ -230,6 +235,7 @@ async def invoke_codex_mcp(
         sandbox_mode: Sandbox strategy
         task_complexity: Desired model reasoning effort level (default: "medium")
         allow_write: Whether to allow file write operations
+        model: Codex model identifier to use (default: "gpt-5-codex")
         model_max_output_tokens: Maximum tokens the model can generate (default: 100000)
         tools_web_search: Enable web search tool (default: False)
         timeout: Command timeout in seconds
@@ -245,6 +251,7 @@ async def invoke_codex_mcp(
     command = os.environ.get("CODEX_CMD", "codex")
     args: List[str] = [
         "mcp",
+        "serve",
         # Configure all policies via -c (process-level config overrides)
         "-c",
         f'approval_policy="{approval_policy}"',
@@ -253,6 +260,9 @@ async def invoke_codex_mcp(
         "-c",
         f'model_reasoning_effort="{task_complexity}"',
     ]
+
+    if model:
+        args.extend(["-c", f'model="{model}"'])
 
     # Enforce read-only mode when writes are not allowed by clearing permissions
     if not allow_write:
@@ -323,10 +333,10 @@ async def invoke_codex_mcp(
                 return lower_map[key.lower()]
         return None
 
-    # Basic elicitation policy to avoid hangs on interactive prompts.
-    # If the Codex MCP server asks for approval (elicitation/create), we
-    # auto-decline unless the user has explicitly enabled write mode and
-    # chosen a permissive approval policy.
+    # Relay elicitation prompts (typically approval requests) back to the
+    # upstream MCP client so the user can interactively respond.
+    # When no upstream context is available (for example during unit tests),
+    # conservatively decline to avoid hanging the child Codex process.
     async def _elicitation_callback(
         context: "mcp_types.RequestContext[ClientSession, Any]",  # type: ignore[name-defined]  # noqa: E501
         params: "mcp_types.ElicitRequestParams",  # type: ignore[name-defined]
@@ -338,26 +348,38 @@ async def invoke_codex_mcp(
         or relaying fails, fall back to a conservative decline to avoid hangs.
         """
         try:
-            # Try to obtain the upstream FastMCP request context
+            request_context = None
+            related_request_id: Optional[str] = None
+
+            # Try to obtain the active FastMCP context so we can proxy the
+            # elicitation request back to Claude (or whichever MCP client is
+            # connected upstream).
             try:
-                if context is not None:
-                    upstream_ctx = context
-                else:
-                    upstream_ctx = mcp.get_context()
-            except Exception:  # noqa: BLE001
+                upstream_ctx = mcp.get_context()
+            except Exception as ctx_exc:  # noqa: BLE001
+                logger.debug("Unable to fetch upstream MCP context: %s", ctx_exc)
                 upstream_ctx = None
 
             if upstream_ctx is not None:
                 try:
-                    # Use server-side raw elicitation to pass through arbitrary schemas
-                    result = await upstream_ctx.request_context.session.elicit(
-                        # type: ignore[union-attr]
-                        message=params.message,
-                        requestedSchema=getattr(params, "requestedSchema", {}) or {},
-                        related_request_id=upstream_ctx.request_id,
+                    request_context = upstream_ctx.request_context  # type: ignore[assignment]
+                    related_request_id = getattr(upstream_ctx, "request_id", None)
+                except Exception as ctx_exc:  # noqa: BLE001
+                    logger.debug(
+                        "Upstream MCP context missing request context: %s", ctx_exc
                     )
 
-                    # Map server result back to client-side result for Codex MCP
+            if request_context is not None:
+                try:
+                    # Forward the elicitation to the upstream client. We pass
+                    # through Codex's requested schema verbatim so any custom
+                    # approval fields show up for the user.
+                    result = await request_context.session.elicit(
+                        message=params.message,
+                        requestedSchema=getattr(params, "requestedSchema", {}) or {},
+                        related_request_id=related_request_id,
+                    )
+
                     action: Literal["accept", "decline", "cancel"] = getattr(
                         result, "action", "decline"
                     )
@@ -489,7 +511,9 @@ async def invoke_codex_mcp(
         )
     except OSError as exc:
         # Process spawn or IO error
-        raise RuntimeError(f"Failed to start or communicate with codex mcp: {exc}")
+        raise RuntimeError(
+            f"Failed to start or communicate with codex mcp serve: {exc}"
+        )
     except Exception as exc:
         raise RuntimeError(f"Codex MCP execution failed: {exc}")
 
@@ -674,6 +698,7 @@ async def codex_delegate(
     ] = "read-only",
     output_format: Literal["explanation", "diff", "full_file"] = "explanation",
     task_complexity: Literal["minimal", "low", "medium", "high"] = "medium",
+    model: Optional[str] = "gpt-5-codex",
     final_output_start_delimiter: Optional[str] = None,
     final_output_end_delimiter: Optional[str] = None,
     final_output_strict: Optional[bool] = None,
@@ -710,6 +735,7 @@ async def codex_delegate(
             injects a format-specific instruction into the prompt so the model
             returns only the requested format inside the delimiters
         task_complexity: Guidance for Codex's reasoning effort (default: "medium")
+        model: Codex model identifier to use (default: "gpt-5-codex")
         max_output_tokens: Maximum tokens Codex may generate in a single response
             (default: 100000)
         final_output_start_delimiter: Start delimiter for output extraction
@@ -850,6 +876,7 @@ async def codex_delegate(
             effective_sandbox_mode,
             task_complexity,
             allow_write,
+            model=model,
             model_max_output_tokens=max_output_tokens,
             tools_web_search=web_search,
         )
@@ -871,6 +898,7 @@ async def codex_delegate(
                 "sandbox_mode": effective_sandbox_mode,
                 "requested_sandbox_mode": sandbox_mode,
                 "optimization_note": optimization_note,
+                "model": model,
                 "codex_prompt": (
                     codex_prompt if codex_prompt != task_description else None
                 ),

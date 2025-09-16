@@ -62,6 +62,7 @@ class TestInvocationArgs(unittest.IsolatedAsyncioTestCase):
             self.assertIn("--", cmd)
             self.assertEqual(cmd[-2], "--")
             self.assertEqual(cmd[-1], prompt)
+            self.assertIn('model="gpt-5-codex"', cmd)
 
     async def test_leading_dash_prompt_is_not_treated_as_flag(self):
         captured_args = {}
@@ -89,6 +90,7 @@ class TestInvocationArgs(unittest.IsolatedAsyncioTestCase):
             # positional arg
             self.assertIn("--", cmd)
             self.assertEqual(cmd[-1], prompt)
+            self.assertIn('model="gpt-5-codex"', cmd)
 
 
 if __name__ == "__main__":
