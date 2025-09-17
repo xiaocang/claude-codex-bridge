@@ -6,9 +6,12 @@ between Claude and OpenAI Codex CLI.
 """
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
+from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 from mcp.server.fastmcp import FastMCP
@@ -36,6 +39,11 @@ Codex excels at:
 • Breaking down complex problems into actionable steps
 • Generating comprehensive test strategies
 • Code review and optimization suggestions
+
+Features:
+• Real-time progress streaming during task execution
+• Upstream progress reporting to MCP clients
+• Automatic fallback to legacy mode if streaming fails
 
 Callers should assess each task's difficulty and set the
 `task_complexity` parameter ("minimal", "low", "medium", or "high") accordingly to
@@ -75,6 +83,23 @@ FINAL_OUTPUT_DELIMITER: str = os.environ.get(
 
 # Write operations will be checked dynamically in codex_delegate function
 
+# Environment variable to enable/disable progress streaming (default: enabled)
+ENABLE_PROGRESS_STREAMING = (
+    os.environ.get("CODEX_ENABLE_PROGRESS_STREAMING", "true").lower() == "true"
+)
+
+
+@dataclass
+class CodexEvent:
+    """Represents a progress or lifecycle event from Codex MCP server."""
+
+    method: str
+    params: Dict[str, Any]
+    conversation_id: Optional[str] = None
+    event_type: Optional[str] = None
+    text_delta: Optional[str] = None
+    is_task_complete: bool = False
+
 
 def _get_codex_backend() -> str:
     """
@@ -85,6 +110,432 @@ def _get_codex_backend() -> str:
     if backend not in {"mcp", "cli"}:
         backend = "mcp"
     return backend
+
+
+class CodexMCPConversationRunner:
+    """
+    Helper class to manage Codex MCP conversation lifecycle with progress streaming.
+
+    This class encapsulates the complexity of setting up a conversation, subscribing
+    to events, and processing real-time progress updates from Codex MCP server.
+    """
+
+    def __init__(
+        self,
+        command: str,
+        args: List[str],
+        working_directory: str,
+        timeout: int = 3600,
+    ):
+        self.command = command
+        self.args = args
+        self.working_directory = working_directory
+        self.timeout = timeout
+        self.events: "asyncio.Queue[CodexEvent]" = asyncio.Queue()
+        self.accumulated_text: List[str] = []
+        self.conversation_id: Optional[str] = None
+        self.subscription_id: Optional[str] = None
+        self.session = None
+
+    async def _parse_notification(
+        self, method: str, params: Dict[str, Any]
+    ) -> CodexEvent:
+        """Parse MCP notification into a CodexEvent."""
+        event = CodexEvent(method=method, params=params)
+
+        if method == "notifications/progress":
+            # Standard MCP progress notification
+            event.text_delta = params.get("message", "")
+
+        elif method.startswith("codex/event"):
+            # Codex-specific event notification
+            msg = params.get("msg", {})
+            event.event_type = msg.get("type") or method.removeprefix("codex/event/")
+            event.conversation_id = params.get("conversationId")
+
+            # Extract text deltas for agent messages
+            if event.event_type in {"agent_message_delta", "agent_reasoning_delta"}:
+                data = msg.get("data", {})
+                event.text_delta = data.get("delta") or data.get("text") or ""
+
+            # Check for task completion
+            if event.event_type == "task_complete":
+                event.is_task_complete = True
+
+        return event
+
+    async def _handle_notification(self, method: str, params: Dict[str, Any]) -> None:
+        """Handle incoming MCP notification and queue as event."""
+        event = await self._parse_notification(method, params)
+        await self.events.put(event)
+
+        # Accumulate text deltas for final response reconstruction
+        if event.text_delta:
+            self.accumulated_text.append(event.text_delta)
+
+    async def _report_progress_upstream(self, event: CodexEvent) -> None:
+        """Report progress to upstream MCP client when available."""
+        try:
+            # Try to get FastMCP context for upstream progress reporting
+            upstream_ctx = mcp.get_context()
+            if upstream_ctx and hasattr(upstream_ctx, "report_progress"):
+                if event.method == "notifications/progress":
+                    progress = event.params.get("progress")
+                    total = event.params.get("total")
+                    message = event.params.get("message", "")
+
+                    if progress is not None and total is not None:
+                        await upstream_ctx.report_progress(progress, total, message)
+                    else:
+                        await upstream_ctx.info(message)
+
+                elif event.event_type in {"task_started", "task_complete"}:
+                    status = (
+                        "Started" if event.event_type == "task_started" else "Completed"
+                    )
+                    await upstream_ctx.info(f"Codex task {status.lower()}")
+
+        except Exception as exc:
+            # Fall back to local logging if upstream reporting fails
+            logger.debug("Failed to report progress upstream: %s", exc)
+
+            # Log progress locally as fallback
+            if event.method == "notifications/progress":
+                progress = event.params.get("progress")
+                total = event.params.get("total")
+                message = event.params.get("message", "")
+                if progress is not None and total is not None:
+                    pct = 100 * progress / total
+                    logger.info("[progress] %.1f%% - %s", pct, message)
+                else:
+                    logger.info("[progress] %s", message)
+            elif event.event_type:
+                logger.info("[codex] %s", event.event_type)
+
+    async def run_conversation(
+        self,
+        prompt: str,
+        model: Optional[str] = "gpt-5-codex",
+        approval_policy: str = "on-failure",
+        sandbox_mode: str = "read-only",
+        task_complexity: str = "medium",
+        max_output_tokens: int = 100000,
+        web_search: bool = False,
+    ) -> Tuple[str, str]:
+        """
+        Run a complete conversation with Codex MCP server with progress streaming.
+
+        Returns:
+            Tuple of (stdout, stderr) compatible with existing interface
+        """
+        # Deferred imports to avoid hard dependency
+        import mcp.types as mcp_types
+        from mcp.client.session import ClientSession
+        from mcp.client.stdio import StdioServerParameters, stdio_client
+
+        # Build server parameters
+        server = StdioServerParameters(
+            command=self.command,
+            args=self.args,
+            env=None,
+            cwd=self.working_directory,
+        )
+
+        # Helper functions from original implementation
+        def _choose_tool(tools: List[mcp_types.Tool]) -> mcp_types.Tool:
+            preferred = {
+                "codex_exec",
+                "codex_execute",
+                "codex_run",
+                "exec",
+                "execute",
+                "run",
+            }
+
+            # Exact preferred name match
+            for tool in tools:
+                if tool.name in preferred:
+                    return tool
+
+            # Heuristic: description keywords
+            keywords = ("execute", "run", "prompt", "codex")
+            for tool in tools:
+                desc = (tool.description or "").lower()
+                if any(k in desc for k in keywords):
+                    return tool
+
+            # Fallback: first tool
+            if not tools:
+                raise RuntimeError("Codex MCP server exposed no tools")
+            return tools[0]
+
+        def _find_key(schema: Dict[str, Any], candidates: List[str]) -> Optional[str]:
+            properties: Dict[str, Any] = {}
+            if isinstance(schema, dict):
+                props = schema.get("properties")
+                if isinstance(props, dict):
+                    properties = {str(k): v for k, v in props.items()}
+
+            for key in candidates:
+                if key in properties:
+                    return key
+
+            # Try case-insensitive match
+            lower_map: Dict[str, str] = {k.lower(): k for k in properties.keys()}
+            for key in candidates:
+                if key.lower() in lower_map:
+                    return lower_map[key.lower()]
+            return None
+
+        # Elicitation callback (reuse existing implementation)
+        async def _elicitation_callback(context, params):
+            try:
+                request_context = None
+                related_request_id: Optional[str] = None
+
+                upstream_ctx = context
+                if upstream_ctx is None:
+                    try:
+                        upstream_ctx = mcp.get_context()
+                    except Exception as ctx_exc:
+                        logger.debug(
+                            "Unable to fetch upstream MCP context: %s", ctx_exc
+                        )
+                        upstream_ctx = None
+
+                if upstream_ctx is not None:
+                    try:
+                        request_context = upstream_ctx.request_context
+                        related_request_id = getattr(upstream_ctx, "request_id", None)
+                    except Exception as ctx_exc:
+                        logger.debug(
+                            "Upstream MCP context missing request context: %s", ctx_exc
+                        )
+                        if context is not None:
+                            try:
+                                upstream_ctx = mcp.get_context()
+                                if upstream_ctx is not None:
+                                    request_context = upstream_ctx.request_context
+                                    related_request_id = getattr(
+                                        upstream_ctx, "request_id", None
+                                    )
+                            except Exception as fallback_exc:
+                                logger.debug(
+                                    "Unable to fetch FastMCP fallback context: %s",
+                                    fallback_exc,
+                                )
+
+                if request_context is not None:
+                    try:
+                        result = await request_context.session.elicit(
+                            message=params.message,
+                            requestedSchema=getattr(params, "requestedSchema", {})
+                            or {},
+                            related_request_id=related_request_id,
+                        )
+
+                        action = getattr(result, "action", "decline")
+                        content = getattr(result, "content", None)
+                        return mcp_types.ElicitResult(action=action, content=content)
+                    except Exception as relay_exc:
+                        logger.debug(
+                            "Failed to relay elicitation upstream: %s", relay_exc
+                        )
+
+                return mcp_types.ElicitResult(action="decline")
+            except Exception as exc:
+                return mcp_types.ErrorData(
+                    code=mcp_types.INVALID_REQUEST,
+                    message=f"elicitation handling failed: {exc}",
+                )
+
+        async def _logging_callback(params):
+            logger.debug("[codex-mcp][%s] %s", params.level, params.data)
+
+        try:
+            async with stdio_client(server) as (read_stream, write_stream):
+                # Custom notification handler for progress streaming
+                async def notification_handler(method: str, params: Any) -> None:
+                    """Handle notifications from Codex MCP server."""
+                    if ENABLE_PROGRESS_STREAMING:
+                        await self._handle_notification(method, params or {})
+
+                async with ClientSession(
+                    read_stream,
+                    write_stream,
+                    read_timeout_seconds=(
+                        timedelta(seconds=self.timeout) if self.timeout else None
+                    ),
+                    elicitation_callback=_elicitation_callback,
+                    logging_callback=_logging_callback,
+                    notification_handler=notification_handler,
+                ) as session:
+                    self.session = session
+
+                    # Initialize session
+                    await session.initialize()
+
+                    # Create conversation
+                    conversation = await session.request(
+                        "newConversation",
+                        {
+                            "model": model,
+                            "cwd": self.working_directory,
+                            "approvalPolicy": approval_policy,
+                            "sandbox": sandbox_mode,
+                        },
+                    )
+                    self.conversation_id = conversation.get("conversationId")
+                    logger.debug("Started conversation %s", self.conversation_id)
+
+                    # Subscribe to events for progress streaming
+                    if ENABLE_PROGRESS_STREAMING:
+                        subscription = await session.request(
+                            "addConversationListener",
+                            {"conversationId": self.conversation_id},
+                        )
+                        self.subscription_id = subscription.get("subscriptionId")
+                        logger.debug(
+                            "Subscribed to conversation events: %s", subscription
+                        )
+
+                        # Start background event consumer
+                        consumer_task = asyncio.create_task(self._consume_events())
+                    else:
+                        consumer_task = None
+
+                    try:
+                        # Discover and call tool (existing logic)
+                        tools_result = await session.list_tools()
+                        tool = _choose_tool(tools_result.tools)
+
+                        input_schema = (
+                            tool.inputSchema
+                            if isinstance(tool.inputSchema, dict)
+                            else {}
+                        )
+
+                        prompt_key = _find_key(
+                            input_schema,
+                            [
+                                "prompt",
+                                "instruction",
+                                "input",
+                                "task",
+                                "query",
+                                "message",
+                                "content",
+                            ],
+                        )
+
+                        args_map: Dict[str, Any] = {}
+                        if prompt_key is not None:
+                            args_map[prompt_key] = prompt
+                        else:
+                            args_map["prompt"] = prompt
+
+                        # Call the tool
+                        result = await session.call_tool(
+                            tool.name,
+                            arguments=args_map,
+                            read_timeout_seconds=(
+                                timedelta(seconds=self.timeout)
+                                if self.timeout
+                                else None
+                            ),
+                        )
+
+                        if result.isError:
+                            raise RuntimeError("Codex MCP tool call returned an error")
+
+                        # Extract text content (existing logic)
+                        texts: List[str] = []
+                        for item in result.content or []:
+                            if isinstance(item, mcp_types.TextContent):
+                                texts.append(item.text)
+                                continue
+
+                            as_dict: Dict[str, Any] = {}
+                            model_dump = getattr(item, "model_dump", None)
+                            if callable(model_dump):
+                                try:
+                                    dumped = model_dump()
+                                    if isinstance(dumped, dict):
+                                        as_dict = dumped
+                                except Exception as exc:
+                                    logger.debug(
+                                        "Failed to model_dump MCP content item %r: %s",
+                                        item,
+                                        exc,
+                                    )
+
+                            if isinstance(as_dict, dict):
+                                text_value = as_dict.get("text")
+                                if text_value is not None:
+                                    try:
+                                        texts.append(str(text_value))
+                                    except Exception as exc:
+                                        logger.debug(
+                                            "Failed to convert text field to str for item %r: %s",
+                                            item,
+                                            exc,
+                                        )
+
+                        # Combine tool result with accumulated streaming text
+                        stdout_text = "\n".join([t for t in texts if t])
+                        if self.accumulated_text:
+                            accumulated = "".join(self.accumulated_text)
+                            if accumulated.strip() and accumulated not in stdout_text:
+                                stdout_text = f"{accumulated}\n{stdout_text}".strip()
+
+                        return stdout_text, ""
+
+                    finally:
+                        # Cleanup: cancel consumer and unsubscribe
+                        if consumer_task:
+                            consumer_task.cancel()
+                            with contextlib.suppress(asyncio.CancelledError):
+                                await consumer_task
+
+                        if self.subscription_id:
+                            with contextlib.suppress(Exception):
+                                await session.request(
+                                    "removeConversationListener",
+                                    {"subscriptionId": self.subscription_id},
+                                )
+
+        except Exception:
+            # Re-raise with original exception type
+            raise
+
+    async def _consume_events(self) -> None:
+        """Background task to consume events and report progress."""
+        try:
+            while True:
+                try:
+                    # Wait for next event with timeout to allow cancellation
+                    event = await asyncio.wait_for(self.events.get(), timeout=1.0)
+
+                    # Report progress upstream
+                    await self._report_progress_upstream(event)
+
+                    # Check for task completion
+                    if (
+                        event.is_task_complete
+                        and event.conversation_id == self.conversation_id
+                    ):
+                        logger.debug("Task completed, stopping event consumer")
+                        break
+
+                except asyncio.TimeoutError:
+                    # Timeout is normal, continue consuming
+                    continue
+
+        except asyncio.CancelledError:
+            logger.debug("Event consumer cancelled")
+            raise
+        except Exception as exc:
+            logger.error("Error in event consumer: %s", exc)
 
 
 async def invoke_codex_cli(
@@ -222,11 +673,12 @@ async def invoke_codex_mcp(
     timeout: int = 3600,
 ) -> Tuple[str, str]:
     """
-    Invoke Codex via its MCP server interface using a non-interactive stdio client.
+    Invoke Codex via its MCP server interface with optional progress streaming.
 
     This function spawns `codex mcp serve` as a child process, performs the MCP
     handshake, discovers an appropriate execution tool, and submits the prompt.
-    It returns concatenated text content from the tool result.
+    When progress streaming is enabled, it provides real-time updates to the
+    upstream MCP client.
 
     Args:
         prompt: The main instruction to send to Codex MCP
@@ -240,14 +692,7 @@ async def invoke_codex_mcp(
         tools_web_search: Enable web search tool (default: False)
         timeout: Command timeout in seconds
     """
-    # Deferred imports to avoid hard dependency on client at import time
-    from datetime import timedelta
-
-    import mcp.types as mcp_types
-    from mcp.client.session import ClientSession
-    from mcp.client.stdio import StdioServerParameters, stdio_client
-
-    # Build server command
+    # Build server command arguments
     command = os.environ.get("CODEX_CMD", "codex")
     args: List[str] = [
         "mcp",
@@ -276,6 +721,40 @@ async def invoke_codex_mcp(
             f"tools.web_search={'true' if tools_web_search else 'false'}",
         ]
     )
+
+    # Use new streaming runner when progress streaming is enabled
+    if ENABLE_PROGRESS_STREAMING:
+        try:
+            runner = CodexMCPConversationRunner(
+                command=command,
+                args=args,
+                working_directory=working_directory,
+                timeout=timeout,
+            )
+
+            return await runner.run_conversation(
+                prompt=prompt,
+                model=model,
+                approval_policy=approval_policy,
+                sandbox_mode=sandbox_mode,
+                task_complexity=task_complexity,
+                max_output_tokens=model_max_output_tokens,
+                web_search=tools_web_search,
+            )
+        except Exception as streaming_exc:
+            # Fall back to original implementation if streaming fails
+            logger.warning(
+                "Progress streaming failed, falling back to legacy mode: %s",
+                streaming_exc,
+            )
+
+    # Original implementation (fallback or when streaming disabled)
+    # Deferred imports to avoid hard dependency on client at import time
+    from datetime import timedelta
+
+    import mcp.types as mcp_types
+    from mcp.client.session import ClientSession
+    from mcp.client.stdio import StdioServerParameters, stdio_client
 
     # Construct stdio server parameters
     server = StdioServerParameters(
@@ -1077,6 +1556,13 @@ codex_delegate(
 - Choose "minimal", "low", "medium", or "high" after assessing the task
 
 ## Advanced Features
+
+### Real-Time Progress Streaming
+The bridge supports real-time progress updates during Codex task execution:
+- **Upstream Reporting**: Progress is automatically relayed to upstream MCP clients
+- **Task Lifecycle**: Receive notifications for task start, progress, and completion
+- **Fallback Safety**: Automatically falls back to legacy mode if streaming fails
+- **Environment Control**: Use `CODEX_ENABLE_PROGRESS_STREAMING=false` to disable
 
 ### Metacognitive Instruction Optimization
 When `ANTHROPIC_API_KEY` environment variable is set, the bridge uses
